@@ -1,0 +1,17 @@
+{
+  "name": "mdm2",
+  "description": "MDM2 N-terminal domain (PDB 1YCR chain A, UniProt Q00987 25-109); p53 pocket",
+  "source": {
+    "pdb_id": "1YCR",
+    "chain": "A",
+    "range": "25-109"
+  },
+  "hotspots": [
+    "L54",
+    "I61",
+    "M62",
+    "V93",
+    "H96"
+  ],
+  "binder_length": 70
+}

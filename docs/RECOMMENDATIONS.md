@@ -1,0 +1,221 @@
+# Running the design pipeline successfully: recommendations
+
+Status: written 2026-10-04 from the evidence in `docs/REPORT.md` (scorer benchmark, generation experiments) and the funnel evaluation
+(`funnel/`). Items marked **[pending]** wait on runs still in progress (FimA, the MPNN-bias experiment) and will be revised.
+For agents (AI assistants) operating the tools, see `AGENTS.md`.
+
+## 1. The workflow to use
+
+```
+define target ─► build + verify shard ─► funnel (500 backbones, ~1.2 GPU-h) ─► judge ─► triage with fastPISA flags ─► order a diverse panel
+```
+
+Default command, after the target is defined (§3):
+
+```bash
+.pxd/envs/pxd/bin/python funnel/run_funnel.py --target <name> --out out/funnel/<name> --n-backbones 500 --rounds 0
+```
+
+`--rounds 0` = no cycling. On the evidence so far this is the best cost/quality point (§5); add `--rounds 3` for hard targets or when you can afford
+~50% more GPU time. One GPU job at a time.
+
+## 2. The five things that matter most (in order of measured effect)
+
+1. **Condition on the right residues.** Hotspot numbers on a prebuilt shard are *the shard's own numbering (restarting at 1)*, not PDB numbering. Wrong
+   indices silently ran in earlier campaigns and cut hit rates from ~100% to ~7–26%. Use `funnel/targets/*.json`, which takes `"Y56"`-style PDB numbers and
+   **asserts residue identity** through the provenance map. Never type shard indices by hand.
+2. **Generate at scale, screen cheaply.** The shipped default (8 backbones) is 12× below upstream's smallest preset. Diffusion costs ~1.5–2.5 s per backbone;
+   scoring is what costs. 500 backbones × 4 sequences, Protenix-0.5-mini "fast" (0.4 s/design) as the screen.
+3. **Use two independent judges.** Boltz-2 *and* Protenix-v2 together beat either (AUROC 0.75 vs 0.69–0.70 on 206 wet-lab-labelled designs); they agree
+   only moderately (Spearman 0.5), so each adds information. Require both (the "consensus pass").
+4. **Triage; do not over-trust the score.** Predictor confidence separates binders from non-binders only modestly (AUROC ≈ 0.65–0.75 anywhere in the
+   benchmark; 0.93 on MDM2, ~0.56–0.84 elsewhere). A pass is "two predictors agree", not "binds".
+5. **Order a diverse panel, not the top few**, with a known binder as positive control. Expect most to fail; the wet lab is the only calibration.
+
+## 3. Target preparation checklist
+
+- Pick the **site from structure**, not from a convention: contact residues with the natural partner, buried area, conservation (see
+  `.archive/docs/measurements/2026-10-03-fima-groove-campaign.md` for a worked example where the inherited epitope was off-site).
+- Build the shard with `scripts/prepare_target.py --source X.pdb --wt-fasta WT.fasta --wt-align sequential --chain A --msa A=<msa_dir> ...`.
+  The MSA directory needs `non_pairing.a3m` whose **query equals the shard sequence** (checked); crop an existing MSA by columns, do not re-query blindly.
+- Write `funnel/targets/<name>.json` (`shard`, `provenance`, `source_chain`, `msa_dir`, `hotspots`, `binder_length`). `load_target` fails loudly on a wrong
+  letter/number or MSA mismatch. Run `python -c "import sys; sys.path.insert(0,'funnel'); import common; print(common.load_target('<name>')['hotspot_idx'])"`.
+- **Hotspots:** 3–6 residues on **one face**. A binder of 60–85 residues covers ~20–28 Å; do not request two distant faces. Prefer deep, hydrophobic pockets
+  (MDM2-like) where predictors are most informative; flat faces (PD-L1) are harder and the scores less trustworthy.
+- **Binder length:** 60–85 for pockets/grooves; match published binders for the target where known.
+- Legacy-mode pipeline manifests now reject hotspots beyond the shard (new guard), but cannot catch an in-range wrong index: only identity assertions do.
+
+## 4. Running it
+
+| item | recommendation |
+|---|---|
+| GPU | **One job at a time.** Concurrent Boltz/Protenix/JAX jobs gave `cusolver`/OOM failures. Check `nvidia-smi` first. JAX preallocates ~75% VRAM unless `XLA_PYTHON_CLIENT_PREALLOCATE=false` (already set in `funnel/`). |
+| Cost, one RTX 5090 | 500 backbones, no cycling: **0.7 h (MDM2, 70 aa) / 1.2 h (PD-L1, 85 aa)**; with 3 cycling rounds 1.1 h / 1.8 h. Pipeline baseline at 100×4: 1.2 h / 1.6 h. |
+| Resume | Every stage's output is reused; `--force` redoes. Safe to stop between stages. |
+| Waiting | Poll with `kill -0 PID` or file existence. **Never `pkill -f`/`pgrep -f` a pattern in your own command line.** |
+| Exit codes | `cmd > log 2>&1; echo` reports echo's status. Capture `$?` on the next line. `State=COMPLETED` / non-empty `summary.csv` are not success: check `bz_status == ok` (the campaign script now does). |
+| Process start-up | Each Protenix/Boltz process pays ~80–140 s start-up; batch many designs per call (the funnel does). |
+
+## 5. Which strategy: evidence so far
+
+Judged identically (Boltz-2, 3 fresh seeds + Protenix-v2; consensus pass = Boltz ipSAE ≥ 0.5 and interface PAE ≤ 2 Å and v2 ipSAE ≥ 0.5; top 20 per arm):
+
+| target | pipeline default 8×4 | pipeline scaled 100×4 | funnel, no cycling | funnel, 3 cycles |
+|---|---|---|---|---|
+| MDM2 | 5 / 8 | 20 / 20 | 20 / 20 (0.7 GPU-h) | 20 / 20 (1.1 h) |
+| PD-L1 | 2 / 8 | 16 / 20 | **20 / 20 (1.2 h)** | 20 / 20 (1.8 h) |
+| FimA | **[pending]** | **[pending]** | **[pending]** | **[pending]** |
+
+- MDM2 saturates, so it cannot rank large-N strategies. PD-L1 does: the funnel's *worst* design on Protenix-v2 is 0.72–0.74 versus 0.17 for the scaled baseline.
+- Cycling adds ~0.02 to median ipSAE for ~45–50% more GPU time and equal pass counts: **optional**, not default. Always judge cycled designs with models that were not in the loop.
+- Do **not** add an MPNN "designability" pre-screen (ESMFold pLDDT / MPNN score are ≈ chance for binding; the fast refold already measures it).
+
+## 6. ProteinMPNN: can we model more hydrophobics?
+
+Short answer: **yes, but by biasing the interface, not by reverting the weights.**
+
+| PD-L1 funnel backbones, 160 sequences | Lys+Glu (all) | aromatic (interface) | hydrophobic (interface) |
+|---|---|---|---|
+| soluble weights (fork default) | 27.7% | 3.6% | 46% |
+| original weights | 25.1% | 4.0% | 47% |
+| original + global bias | 7.4% | 4.2% | 53% (too aggressive; aggregation risk) |
+| **original + interface-only bias** | 20.5% | **6.8%** | **56%** |
+| soluble + interface-only bias | 24.3% | **7.0%** | 52% |
+
+- Reverting to `original` changes hydrophobics by ~4 points and aromatics not at all. Earlier tests also showed the weights do not change the Boltz-2 score tail.
+- Real PD-L1 binders (ProteinBase) have 6.6% aromatics and PISA-measured 3.5 aromatic residues at the interface; the funnel's shortlists have ~1.
+- `funnel/run_funnel.py --mpnn-bias iface` adds +1.0 (F,W,Y), +0.5 (L,I,M,V), −0.5 (K,E,D,N,Q) logits **only on binder residues within 10 Å of the target**.
+- **[pending]** whether these sequences fold and score as well or better: `funnel/run_bias_experiment.sh` (PD-L1 and MDM2, judged head-to-head against the default-MPNN
+  funnel) runs automatically after the main evaluation. Until it reports, treat the bias as a hypothesis; do not make it the default.
+
+## 7. Reading the outputs
+
+- `final_*.csv` (shortlist, de-duplicated at 60% identity) and `consensus_*.csv` (all 60 evaluated). Key columns: `b_ipsae`, `b_paemin`, `v2_ipsae`, `consensus_pass`,
+  `hotspot_frac`, `pisa_*`, `pisa_flags`.
+- **fastPISA flags are triage, not ranking.** Flagged designs (thin interface < 630 Å², < 4 H-bonds, no aromatic contact, apolar fraction < 0.33) were less likely to be real
+  binders among gate-passers (38% vs 65%, p = 0.01, small n). They add ≈ +0.01 AUROC beyond ipSAE: do not weight them into a score.
+- Shape complementarity and interface pLDDT were the strongest single extras in ProteinBase but are target-dependent / not yet implemented here.
+- Never compare `bz_*` scores across runs or batches; compare only within one judge run.
+
+## 8. Known weaknesses to design around
+
+| weakness | mitigation |
+|---|---|
+| Designs are ~84% helical, 30–45% Lys+Glu, aromatic-poor | interface bias [pending]; inspect `pisa_n_aromatic_iface`; order diverse panel |
+| Two predictors place the binder within 5 Å in only ~40% of cases | do not treat one predicted pose as the binding mode; consider ensembles/third predictor |
+| Gate `bz_gate_egfr_provisional_v1` is EGFR-derived | use the consensus judge; calibrate per target on labelled designs where available |
+| ProteinBase negatives are pre-filtered | benchmark AUROCs are pessimistic against junk, optimistic about nothing |
+| No wet-lab loop | ask for 10–20 experimental results to calibrate before scaling up |
+
+## 9. What not to do
+
+- Do not enter hotspots as raw numbers on a shard; do not skip `load_target`'s identity check.
+- Do not run two GPU jobs; do not `pkill -f`; do not trust an exit code from `cmd; echo`.
+- Do not report a consensus pass as a binder, or compare scores across runs, or quote a gain without n and an interval.
+- Do not pip-install into the working envs without `--no-deps` (numpy/torch pins); external code lives in `.pxd/ext/`.
+- Do not use composition/length features to predict binding: they identify the *design method* (AUROC 0.84 random CV → 0.73 held-out methods).
+
+## 10. Why are the designs Lys/Glu-rich? (investigated 2026-10-04)
+
+Tested, in this order:
+
+| hypothesis | result |
+|---|---|
+| The scorers prefer charged helices, so selection enriches Lys+Glu | **No.** Raw MPNN sequences already carry it (MDM2 42.5%, PD-L1 30.4%); the top 10% by predictor score has *less* (MDM2 39%) or equal (PD-L1 31%) Lys+Glu. |
+| The "soluble" MPNN weights | **Minor.** Original weights lower it by ~2–3 points. |
+| MPNN temperature | **No effect** (T = 0.0001 / 0.1 / 0.3: 28.2 / 28.1 / 25.9%). |
+| Our diffusion backbones are unusually helical | **No.** 95–96% helical, same as mosaic (95%) and RFdiffusion (94%); BoltzGen 81%, BindCraft 88%. |
+| It is specific to PXDesign | **No.** ProteinBase medians: mosaic 32.5%, PXDesign submissions 31%, RFdiffusion 28%, BindCraft 26%, **BindCraft2 25.5%**, BoltzGen 14%. RFdiffusion's own native IL7R designs (81% wet-lab hit rate) are 42% Lys+Glu. |
+
+**Cause (best supported):** ProteinMPNN's amino-acid prior on idealized helical surfaces. Half of all surface positions come out Lys/Glu (50%), whichever tool made the backbone.
+**What does differ from BindCraft(2) is aromatics:** 11–12% vs 3.7–4.8% for the MPNN-only tools (RFdiffusion, PXDesign). BindCraft keeps its AF2-hallucinated sequence and runs MPNN
+only on the interface; MPNN-from-scratch on a helical bundle asks for few aromatics. Our backbones also elicit fewer aromatics from MPNN (2.7%) than other tools' backbones do (~6%).
+**So the lever is the sequence stage, not the generator or the scorer:** interface-only bias (built, test queued), a moderate K/E penalty on surface positions, or a hallucination/co-design
+step that supplies aromatics (§12). High Lys+Glu alone is not disqualifying (wet-lab RFdiffusion binders have it); aromatic-poor interfaces are the better warning sign.
+
+## 11. Metric bands (binder-probability tiers from wet-lab data)
+
+Binder rate per band, 90% Wilson intervals, ProteinBase wet-lab labels:
+
+| metric | band → binder rate | data |
+|---|---|---|
+| Boltz-2 ipSAE (min) | <0.3: 21% · 0.3–0.5: 41% · 0.5–0.7: 56% · 0.7–0.8: 61% · ≥0.8: 75% (n=8) | our 206 (base 50%) |
+| Protenix-v2 ipSAE | <0.3: 40% · 0.3–0.7: 13–32% · 0.7–0.8: 74% · ≥0.8: 78% | our 206 (non-monotone below 0.7) |
+| interface PAE min | <0.8 Å: 73% · 0.8–1.5: 51% · 1.5–3: 38% · >3: 8–27% | our 206 |
+| **both models ≥ 0.7** | **75% [65–84]** vs one ≥ 0.5: 45% · neither: 29% | our 206 |
+| Boltz-2 ipSAE (Adaptyv) | <0.2: 3% · 0.2–0.6: 7–8% · 0.6–0.8: 13% · ≥0.8: 39% (n=18) | Nipah G (base 10%) |
+| shape complementarity (Adaptyv, 0–100) | quintiles: 6 / 4 / 5 / 11 / **22%** (>58.5) | Nipah G |
+| Boltz-2 interface pLDDT | <0.7: 1% · 0.7–0.85: 6–8% · 0.85–0.9: 18% | Nipah G |
+
+Use: tier designs by how many independent signals are in their top band (both models ≥ 0.7; interface PAE < 0.8 Å; shape complementarity in the top quintile where computed) and
+report the *tier's* empirical binder rate, not a single score. Caveats: bands are target-dependent (rates differ 5× between Nipah G and PD-L1), intervals are wide, ProteinBase negatives are
+pre-filtered, and the Anthropic × Adaptyv competition results were not available in the 2026-01-28 export; add them (same code, `funnel/calibrate.py` planned) and refresh the bands.
+
+## 12. Hallucination / joint sequence-structure design without AF2
+
+Verified by search (2026-10-04), not yet installed or tested here:
+- **BoltzDesign1** (github.com/yehlincho/BoltzDesign1): gradient hallucination through Boltz-1 (Pairformer + confidence head), then LigandMPNN; reported without experimental validation at the time.
+- **Mosaic** (github.com/escalante-bio/mosaic, JAX): composes Boltz-1/2, BoltzGen, AF2, OpenFold3, ESMFold2, **Protenix**, ProteinMPNN variants, ESM and stability models into one loss, so composition priors
+  (aromatics, charge) can be explicit loss terms. Listed in ProteinBase with high hit rates (PD-L1 80%, IL7R 85%; n = 20 each).
+- **BoltzGen** (github.com/HannesStark/boltzgen, MIT): all-atom generative co-design of sequence and structure with a binding-site specification language; ProteinBase shows 1–31% hit rates depending on target.
+- ColabDesign (vendored) supports AF2 hallucination; independent of the judges, which is a plus for AF2 specifically.
+Recommendation: pilot Mosaic (Boltz-2 + Protenix + an aromatic/charge prior) on one pocket target and judge with the existing consensus protocol; it is the most direct fix for §10.
+
+## 13. Engineering: the LayerNorm compile
+
+Cause: `torch/include/ATen/core/List_inl.h:202` uses `typename decltype(impl_->list)::difference_type`, which GCC 15 rejects ([-Wtemplate-body]); `-fpermissive` does not help; `g++-13` is not installed.
+Fix (verified: builds in 26 s): override that one line via an include path ahead of torch's (torch's file untouched). `funnel/build_layernorm.py` builds it inside `.pxd/ln_build/`;
+`--install` copies the `.so` where `layer_norm.py` imports it first, removing the ~80 s failed compile from every Protenix start (≈15–20% of a funnel run);
+`--verify` (idle GPU) compares it against `torch.nn.functional.layer_norm`. **Not installed yet** (shared environment; awaiting go-ahead and an idle GPU).
+
+## 14. Preparing for lab feedback
+
+1. **Record, at ordering:** design id, sequence, run folder, all scores (Boltz-2 per seed, v2), tier, `pisa_flags`, MPNN settings, hotspot residues.
+2. **Order for learning, not only for winning:** ~10–20 designs stratified over tiers (include a few from the middle and lowest passing tiers and a few flagged), plus a known binder (positive) and a
+   scrambled or off-target-looking design (negative). That is what lets the bands be recalibrated.
+3. **Order for diversity:** one design per sequence cluster (<60% identity) and per backbone family; include a small set from the interface-bias arm if its test is positive.
+4. **When results arrive:** compute binder rate per tier/band with intervals, per target; update §11; decide on the gate and whether to change generator or sequence design (§10, §12).
+
+## 15. Cyclic peptides: what this setup can and cannot do today (checked 2026-10-04)
+
+Facts verified in the installed code (not yet exercised on cyclic data):
+- **Boltz-2** supports cyclic chains natively: a chain property `cyclic: true` sets `cyclic_period = len(sequence)` in the parser. This is the primary scorer for peptides.
+- **This repo's AF2 evaluator** already has an `is_cyclic` option and `add_cyclic_offset` (`pxdbench/tools/af2/`): usable as an independent second judge (different model family from Boltz).
+- **Protenix** shows no cyclic-chain option (only a `cyclic-pseudo-peptide` ligand type). The Protenix-0.5-mini fast screen and Protenix-v2 judge would model a linear chain, so they are not valid for head-to-tail cyclic peptides.
+- **PXDesign diffusion** is not cyclic-aware and is built for 50-150 aa proteins; it is the wrong generator for 8-20 aa cyclic peptides.
+- **BoltzGen** (MIT; weights are already cached on this machine) has a `peptide-anything` protocol with disulfide-bond constraints (`bond: atom1 [S, i, SG] ... atom2 [S, j, SG]`) and per-residue `binding_types` for the target. I could not confirm head-to-tail
+  cyclization support from its README; check the docs before relying on it. ColabDesign-style AF2 hallucination with a cyclic offset (as in BindCraft's cyclic option) is the established alternative.
+
+Proposed adaptation of the funnel (not built):
+1. Target JSON: `binder_cyclic: true`, `binder_length: 10-18`, hotspot residues as now.
+2. Generate: BoltzGen `peptide-anything` (or AF2 cyclic hallucination); no MPNN-on-Gly step. If sequences are redesigned, MPNN needs residue-index offsets so the termini are neighbours (small patch, untested).
+3. Screen: Boltz-2 single seed with `cyclic: true` (small binders fold in ~3 s; there is no cheap cyclic-aware model, so the "fast screen" is Boltz-2 itself).
+4. Judge: Boltz-2 (3 seeds, cyclic) + AF2 with cyclic offset. Replace ipSAE-only gating with ipTM, interface PAE, peptide pLDDT, **closure check** (N-C peptide-bond distance ~1.33 A), rigidity (spread over seeds) and fastPISA/SC.
+5. Composition rules differ: peptides are synthesised (non-natural residues possible but not modelled), so Lys/Glu and aromatic rules from the protein work do not transfer; Cys only if a disulfide is intended.
+6. Validation first: fold known cyclic-peptide/protein complexes with `cyclic: true` and with the chain linear; the cyclic run must close the ring and score higher; then compare Boltz-2 vs AF2-cyclic agreement. Effort: scoring changes are hours; a validated generator integration is ~1-2 days.
+
+
+## 16. Resume, extend and multi-GPU (implemented 2026-10-05)
+
+Every stage is split into units that are saved as they finish: generation chunks (`--chunk`, default 100 backbones), per-chunk design + fast screen, every cycling round (`cycle/state.json`),
+every Boltz/Protenix prediction. Re-running the same command continues from the last finished unit; raising `--n-backbones`, `--rounds` or `--final-m` extends the same run.
+Smoke-tested by killing a run mid-stage, resuming (only the unfinished chunk was redone), extending the backbone count (only the new chunk) and raising the rounds (continued after round 1).
+A changed start set (more backbones) restarts cycling and archives the old state (`cycle_old_*`). `--gpus` runs units in parallel (tested logically with two workers on one card; a real 4-GPU run is pending).
+
+## 17. Dock a known scaffold, redesign the interface (experimental)
+
+`funnel/dock_redesign.py`: LightDock (GPL-3.0, own venv, subprocess only) with restraints on the hotspots -> diverse top poses -> `mpnn_run.py scope=interface` (only binder residues within 10 A of the
+target change; the rest of the scaffold keeps its identity) -> `--designs-csv` into the funnel (interface-only cycling). The un-redesigned scaffold is included as a control.
+Install: `./scripts/setup_extras.sh`. Replace `dock_one()` to use another docker.
+
+**First evidence (smoke test, FN3 monobody and protein A domain on FimH, 4 poses x 4 designs):** all 32 redesigns scored ipSAE ~ 0. Diagnosis (`ipTM` 0.11, median binder displacement 21-34 A from the docked position):
+the co-folding predictors do not believe in the interface at all, so they place the binder anywhere. A natural scaffold with 14-23 swapped interface residues carries no interface signal the predictor recognises, even if the docked pose is physically reasonable.
+Consequences: (1) judging a docked pose with a co-folding model measures *recognisability of the sequence as a binder*, not pose quality; (2) forcing the pose (template or contact constraints) would inflate scores for any sequence - the shuffle control would expose it;
+(3) a fair judge of a docked pose needs an energy/physics term (e.g. Rosetta interface dG, MPNN score of the complex), which is not installed here. The full overnight run measures how far more poses and interface-only cycling move this.
+
+## 18. Publishing the code without private data
+
+`python scripts/export_public.py --dest ../binderfunnel-public --run-tests` copies an allowlist (no structures, MSAs, run outputs, per-design benchmark tables, private manifests or git history),
+sanitizes machine paths, runs `scripts/check_public.py` (personal paths/handles, emails, credentials, data files, large files, symlinks) and the test suite inside the clean tree
+(616 passed, 64 skipped, 0 failed at the time of writing). It does `git init` but no commit and no remote. Targets are rebuilt from public PDB ids by `funnel/fetch_target.py`.
+Items for the owner to decide before publishing: the licence (AGPL-3.0, `COMMERCIAL.md`), the project name, and whether the benchmark figures in `docs/` may be shown.

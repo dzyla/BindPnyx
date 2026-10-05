@@ -1,0 +1,7 @@
+{
+  "name": "fimh_rim",
+  "description": "FimH lectin domain (PDB 3MCY chain A, 1-158), pocket RIM only (Y48, N135, F142): tests whether fewer, more accessible hotspots work better than the full mannose-pocket set.",
+  "source": {"pdb_id": "3MCY", "chain": "A", "range": "1-158", "ligand": "ZH1", "probe_radius": 5.0},
+  "hotspots": ["Y48", "N135", "F142"],
+  "binder_length": 65
+}

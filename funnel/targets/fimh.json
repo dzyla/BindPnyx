@@ -1,0 +1,7 @@
+{
+  "name": "fimh",
+  "description": "E. coli type-1 pilus adhesin FimH, lectin domain (PDB 3MCY chain A, residues 1-158): mannose-binding pocket. Goal: a protein that occupies/blocks the mannose site (competitive inhibitor).",
+  "source": {"pdb_id": "3MCY", "chain": "A", "range": "1-158", "ligand": "ZH1", "probe_radius": 5.0},
+  "hotspots": ["Y48", "D54", "N135", "D140", "F142"],
+  "binder_length": 65
+}

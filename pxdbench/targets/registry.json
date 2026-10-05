@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "targets": {
+    "egfr_obj2": {
+      "target_label": "EGFR obj2 (2-chain shard)",
+      "shard": null,
+      "source_structure": null,
+      "chain_filter": [
+        "A",
+        "B"
+      ],
+      "numbering": "work",
+      "epitope": null
+    }
+  },
+  "gates": {
+    "bz_gate_egfr_provisional_v1": {
+      "target_id": "egfr_obj2",
+      "target_label": "EGFR obj2 (provisional)",
+      "thresholds": {
+        "bz_n_seeds": [
+          ">=",
+          3
+        ],
+        "bz_pae_interface_min": [
+          "<=",
+          2.0
+        ],
+        "bz_ipsae": [
+          ">=",
+          0.5
+        ]
+      },
+      "provisional": true,
+      "engagement_required": false,
+      "seed_aggregation": "mean",
+      "missing_data": "unknown",
+      "conditioning_mode": "unconstrained",
+      "calibrated_on": "PROVISIONAL: thresholds inherited from a three-term gate whose dropped interface_plddt clause strictly LOOSENS it; the 602-design labelled set is not available. Not a validated filter."
+    }
+  },
+  "noise_floors": {},
+  "default_gate": "bz_gate_egfr_provisional_v1",
+  "default_target": "egfr_obj2"
+}

@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "provisional": true,
+  "mandatory_validity": true,
+  "calibrated_on": "No active quality clauses. Mandatory validity and any enforced epitope/mechanism policy still apply.",
+  "clauses": {
+    "bz_n_seeds": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "bz_ipsae": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "bz_ipdae": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "bz_pae_interface_min": {
+      "threshold": null,
+      "operator": null,
+      "higher": false
+    },
+    "bz_interface_plddt": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "bz_iptm": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "bz_ptm": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "bz_complex_plddt": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "ep_satisfied": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    }
+  }
+}

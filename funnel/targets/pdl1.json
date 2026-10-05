@@ -1,0 +1,17 @@
+{
+  "name": "pdl1",
+  "description": "PD-L1 IgV domain (PDB 3BIK chain A, UniProt Q9NZQ7 18-229); PD-1 binding face",
+  "source": {
+    "pdb_id": "3BIK",
+    "chain": "A",
+    "range": "18-229"
+  },
+  "hotspots": [
+    "Y56",
+    "E58",
+    "R113",
+    "M115",
+    "Y123"
+  ],
+  "binder_length": 85
+}

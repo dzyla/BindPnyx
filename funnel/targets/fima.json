@@ -1,0 +1,17 @@
+{
+  "name": "fima",
+  "description": "E. coli type-1 pilus subunit FimA (PDB 4DWH chain B, residues 17-159); donor-strand groove, F154 anchor",
+  "source": {
+    "pdb_id": "4DWH",
+    "chain": "B",
+    "range": "17-159"
+  },
+  "hotspots": [
+    "Q30",
+    "V32",
+    "T153",
+    "F154",
+    "V156"
+  ],
+  "binder_length": 60
+}

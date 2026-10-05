@@ -1,0 +1,54 @@
+# This project's own packaging metadata.
+#
+# `setup.py` is upstream PXDesign's (Apache-2.0, ByteDance) and is left alone;
+# this file declares the project rather than the vendored tree.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "binderfunnel"
+version = "0.1.0"
+description = "BinderFunnel (working name): resumable protein-binder design workflow built on PXDesign diffusion, ProteinMPNN, Protenix and Boltz-2"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "AGPL-3.0-or-later" }
+classifiers = [
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+  "Private :: Do Not Upload",
+]
+
+# Runtime dependencies are deliberately NOT listed here. This pipeline needs two
+# mutually incompatible torch builds - Boltz and the pipeline pin different ones,
+# and Boltz is run as a subprocess precisely so they never share an interpreter
+# (CLAUDE.md section 2). A single dependency set cannot express that, so
+# `scripts/setup.sh` builds both environments and `scripts/pxd_env.py` reports
+# what the machine can actually run.
+dependencies = []
+
+[project.optional-dependencies]
+# The suite itself needs nothing beyond pytest; it stubs the fold seam and never
+# invokes a predictor (CLAUDE.md section 7, open question 4). Pinned with their
+# own dependencies: an earlier `--no-deps` install worked only because
+# `packaging` happened to already be present, which would leave pytest
+# importable-but-broken on a clean environment.
+test = [
+  "pytest>=8",
+  "pluggy>=1.5",
+  "iniconfig>=2",
+  "packaging>=23",
+  "numpy",
+  "pandas",
+  "biopython",
+  "PyYaml",
+]
+
+[tool.setuptools]
+# Vendored, locally patched, and governed by their own upstream licences; see
+# THIRD_PARTY.md and each tree's PATCHES.md.
+packages = ["pxdesign", "pxdbench", "colabdesign"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

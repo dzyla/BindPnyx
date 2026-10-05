@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "provisional": true,
+  "mandatory_validity": true,
+  "calibrated_on": "PROVISIONAL. Thresholds inherited from a three-term gate whose dropped interface_plddt clause strictly LOOSENS it; the 602-design labelled set is not available. A selection rule, not a validated filter.",
+  "clauses": {
+    "bz_n_seeds": {
+      "threshold": 3,
+      "operator": ">=",
+      "higher": true
+    },
+    "bz_ipsae": {
+      "threshold": 0.5,
+      "operator": ">=",
+      "higher": true
+    },
+    "bz_ipdae": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "bz_pae_interface_min": {
+      "threshold": 2.0,
+      "operator": "<=",
+      "higher": false
+    },
+    "bz_interface_plddt": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "bz_iptm": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "bz_ptm": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "bz_complex_plddt": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    },
+    "ep_satisfied": {
+      "threshold": null,
+      "operator": null,
+      "higher": true
+    }
+  }
+}

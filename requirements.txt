@@ -1,0 +1,45 @@
+PyYaml
+scipy
+ml_collections
+tqdm
+pandas
+optree
+rdkit
+biopython==1.83
+modelcif==0.7
+biotite==1.0.1
+scikit-learn
+scikit-learn-extra
+deepspeed>=0.15.1
+protobuf==3.20.2
+icecream
+ipdb
+wandb
+numpy==1.26.3
+matplotlib==3.9.2
+ipywidgets
+py3Dmol
+# WARNING: this used to pin torch==2.3.1 with nvidia-cublas-cu12. On an
+# RTX 5090 (sm_120) torch 2.3/cu121 reports cuda.is_available() == True and
+# then fails on any kernel launch, so 2.3.1 silently produces a broken env.
+# Verify any torch install with a real matmul, never the availability flag.
+# Mixing cu12 and cu13 nvidia wheels also collides: both unpack into
+# nvidia/cudnn/lib and the older one wins, leaving torch unable to find
+# libcudnn.so.9.
+torch>=2.7
+fair-esm
+posix_ipc
+einops
+transformers==4.51.3
+optax==0.2.5
+dm-haiku==0.0.13
+natsort
+dm-tree
+# PIN: pxdesign/model/embedders.py needs protenix.model.protenix.
+# update_input_feature_dict, absent before 2.x. An unpinned >=0.1.0
+# resolved to 0.5.5 in one env, where the diffusion stage could never run.
+# NOTE 2.0.0 JIT-builds a fused LayerNorm CUDA extension with no fallback;
+# it fails against torch 2.14 headers and targets no sm_120, so on an
+# RTX 5090 use an env where that extension already built (torch 2.11+cu128).
+protenix==2.0.0
+pxdbench>=0.1.0

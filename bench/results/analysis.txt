@@ -1,0 +1,29 @@
+target                POOLED   egfr   il7r   mdm2  pd-l1
+score                                                   
+b_ipsae_max            0.726  0.742  0.609  0.885  0.756
+b_ipsae_min            0.671  0.703  0.564  0.927  0.742
+b_iptm                 0.715  0.730  0.620  0.921  0.736
+ptx05_fast_ipsae_max   0.631  0.579  0.630  0.697  0.706
+ptx05_fast_ipsae_min   0.625  0.567  0.599  0.661  0.704
+ptx05_fast_iptm        0.653  0.649  0.629  0.721  0.694
+ptx05_fast_rank        0.650  0.648  0.633  0.703  0.694
+ptx_v1_ipsae_max       0.588  0.554  0.626  0.594  0.742
+ptx_v1_ipsae_min       0.578  0.553  0.619  0.588  0.781
+ptx_v1_iptm            0.587  0.578  0.682  0.558  0.730
+ptx_v1_rank            0.589  0.589  0.676  0.552  0.729
+ptx_v2_ipsae_max       0.690  0.667  0.710  0.788  0.824
+ptx_v2_ipsae_min       0.665  0.601  0.701  0.818  0.838
+ptx_v2_iptm            0.701  0.703  0.728  0.752  0.802
+ptx_v2_rank            0.696  0.703  0.726  0.733  0.808
+
+within-method AUROC (method, target, n):
+  egfr    protrl       n=12 pos=10 b_iptm=0.70  b_ipsae_min=0.75  ptx05_fast_iptm=0.65  ptx05_fast_ipsae_min=0.65  ptx_v1_iptm=nan  ptx_v1_ipsae_min=nan  ptx_v2_iptm=0.30  ptx_v2_ipsae_min=0.42
+  il7r    boltzgen     n=24 pos= 4 b_iptm=0.53  b_ipsae_min=0.56  ptx05_fast_iptm=0.45  ptx05_fast_ipsae_min=0.53  ptx_v1_iptm=0.51  ptx_v1_ipsae_min=0.54  ptx_v2_iptm=0.38  ptx_v2_ipsae_min=0.33
+  il7r    mosaic       n= 9 pos= 7 b_iptm=0.43  b_ipsae_min=0.43  ptx05_fast_iptm=0.64  ptx05_fast_ipsae_min=0.57  ptx_v1_iptm=0.50  ptx_v1_ipsae_min=0.57  ptx_v2_iptm=0.43  ptx_v2_ipsae_min=0.50
+  il7r    rfdiffusion  n=27 pos=19 b_iptm=0.43  b_ipsae_min=0.36  ptx05_fast_iptm=0.39  ptx05_fast_ipsae_min=0.36  ptx_v1_iptm=0.50  ptx_v1_ipsae_min=0.41  ptx_v2_iptm=0.58  ptx_v2_ipsae_min=0.55
+  mdm2    evodiff      n=26 pos=11 b_iptm=0.92  b_ipsae_min=0.93  ptx05_fast_iptm=0.72  ptx05_fast_ipsae_min=0.66  ptx_v1_iptm=0.56  ptx_v1_ipsae_min=0.59  ptx_v2_iptm=0.75  ptx_v2_ipsae_min=0.82
+  pd-l1   boltzgen     n=27 pos= 5 b_iptm=0.32  b_ipsae_min=0.42  ptx05_fast_iptm=0.34  ptx05_fast_ipsae_min=0.35  ptx_v1_iptm=0.26  ptx_v1_ipsae_min=0.31  ptx_v2_iptm=0.46  ptx_v2_ipsae_min=0.47
+  pd-l1   dsm-synteract n=17 pos=12 b_iptm=0.72  b_ipsae_min=0.63  ptx05_fast_iptm=0.43  ptx05_fast_ipsae_min=0.45  ptx_v1_iptm=0.68  ptx_v1_ipsae_min=0.75  ptx_v2_iptm=0.92  ptx_v2_ipsae_min=0.90
+  pd-l1   mosaic       n=16 pos=13 b_iptm=0.59  b_ipsae_min=0.67  ptx05_fast_iptm=0.56  ptx05_fast_ipsae_min=0.69  ptx_v1_iptm=0.67  ptx_v1_ipsae_min=0.79  ptx_v2_iptm=0.59  ptx_v2_ipsae_min=0.74
+
+mean s/design: {'b_sec': 13.2, 'ptx05_fast_sec': 1.2, 'ptx_v1_sec': 7.0, 'ptx_v2_sec': 10.1}

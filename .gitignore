@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+# environments, weights, data and outputs never belong in git
+.pxd/
+checkpoints/
+release_data
+data/
+out/
+*.pkl.gz
+*.a3m
+*.cif
+*.pdb
+!tests/fixtures/*

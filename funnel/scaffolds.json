@@ -1,0 +1,10 @@
+{
+  "ubiquitin":     {"pdb_id": "1UBQ", "chain": "A", "note": "76 aa, compact alpha/beta; extremely stable"},
+  "protein_g_b1":  {"pdb_id": "1PGA", "chain": "A", "note": "56 aa, beta-grasp"},
+  "protein_a_b":   {"pdb_id": "1BDD", "chain": "A", "note": "60 aa, three-helix bundle (affibody parent fold)"},
+  "fn3_monobody":  {"pdb_id": "1TTG", "chain": "A", "note": "94 aa, FN3 10th domain: monobody scaffold, loop-based interface"},
+  "darpin":        {"pdb_id": "1MJ0", "chain": "A", "note": "159 aa ankyrin-repeat protein: concave binding surface"},
+  "top7":          {"pdb_id": "1QYS", "chain": "A", "note": "91 aa designed alpha/beta fold"},
+  "sh3":           {"pdb_id": "1SHG", "chain": "A", "note": "57 aa SH3 domain"},
+  "nanobody_vhh":  {"pdb_id": "1MEL", "chain": "A", "note": "132 aa camelid VHH: CDR-loop interface"}
+}
