@@ -19,7 +19,7 @@ One GPU job at a time: stages run strictly in sequence."""
 import argparse, hashlib, json, os, shutil, subprocess, sys, time
 from pathlib import Path
 import pandas as pd
-sys.path.insert(0, str(Path(__file__).resolve().parent)); import common, make_manifest
+sys.path.insert(0, str(Path(__file__).resolve().parent)); import common, make_manifest, oracles
 REPO = common.REPO
 
 def log(*a): print(time.strftime("%H:%M:%S"), *a, flush=True)
@@ -55,11 +55,16 @@ def run_mpnn(pdb_dir, n, out_csv, weights="soluble", temp="0.1", bias="none", sc
     return pd.read_csv(out_csv)
 
 # ------------------------------------------------------------------ config guard
-GUARD = ("target", "hotspot_idx", "binder_length", "chunk", "steps", "seqs", "mpnn_weights", "mpnn_bias", "cycle_scope", "designs_csv_sha")
+GUARD = ("target", "hotspot_idx", "binder_length", "chunk", "steps", "seqs", "mpnn_weights", "mpnn_bias", "cycle_scope", "designs_csv_sha",
+         "judge", "second_oracle", "boltz_seeds")      # rank_rule is NOT guarded: it only re-orders finished predictions
+# What a run folder started before --judge existed means. Without this, `--judge new` on such a folder would silently mix two judges in one consensus table.
+LEGACY = dict(judge="legacy", second_oracle="protenix-v2", boltz_seeds="1,2,3")      # rank_rule: "min"
+# judge regime -> defaults. `new` = ONE Boltz-2 seed + ONE AlphaFold3 seed (two architectures beat three Boltz seeds at lower cost on the release benchmark).
+JUDGES = {"legacy": dict(second_oracle="protenix-v2", boltz_seeds="1,2,3", rank_rule="min"), "new": dict(second_oracle="af3", boltz_seeds="1", rank_rule="mean")}
 def check_config(out, cfg, allow):
     f = out / "run_config.json"
     if f.exists():
-        old = json.load(open(f)); diff = {k: (old.get(k), cfg.get(k)) for k in GUARD if k in old and old.get(k) != cfg.get(k)}
+        old = json.load(open(f)); diff = {k: (old.get(k, LEGACY.get(k)), cfg.get(k, LEGACY.get(k))) for k in GUARD if (k in old or k in cfg or k in LEGACY) and old.get(k, LEGACY.get(k)) != cfg.get(k, LEGACY.get(k))}
         if diff and not allow:
             raise SystemExit("Refusing to resume: these settings differ from the ones this run was started with (finished units would be inconsistent):\n  "
                              + "\n  ".join(f"{k}: was {a!r}, now {b!r}" for k, (a, b) in diff.items()) + "\nUse the original values, a new --out, or --allow-config-change.")
@@ -177,23 +182,34 @@ def _p(x):
     x = Path(str(x)); return x if x.is_absolute() else REPO / x
 
 # ------------------------------------------------------------------ stage 5: consensus
-def consensus(t, cands, outdir, seeds, T, tag, gpus=None):
-    """Boltz-2 (seeds) + Protenix-v2 on cands (id, seq). Returns the table with gate flags, hotspot contact, site occlusion and interface-quality columns.
+def consensus(t, cands, outdir, seeds, T, tag, gpus=None, oracle2="protenix-v2", o2_gate=0.5, rank_rule="min"):
+    """Boltz-2 (`seeds`) + a second oracle on cands (id, seq). Returns the table with gate flags, hotspot contact, site occlusion and interface-quality columns.
+    The second oracle's columns are called v2_* whichever model it is (downstream files depend on that); `o2_name` records the model.
     Resumable: predictions already on disk are reused."""
     outdir = Path(outdir)
-    gpus = gpus or [None]; res = {}
+    gpus = gpus or [None]; res = {}; boltz_done = threading.Event()
     def run_b():
-        common.set_gpu(None); t0 = time.time(); res["b"] = common.boltz_fold(cands[["id", "seq"]], t, outdir / "boltz", seeds=seeds, gpus=gpus[:max(1, len(gpus) - 1)] if len(gpus) > 1 else gpus); T.add(f"5_boltz_{tag}", time.time() - t0)
+        try:
+            common.set_gpu(None); t0 = time.time(); res["b"] = common.boltz_fold(cands[["id", "seq"]], t, outdir / "boltz", seeds=seeds, gpus=gpus[:max(1, len(gpus) - 1)] if len(gpus) > 1 else gpus); T.add(f"5_boltz_{tag}", time.time() - t0)
+        finally: boltz_done.set()
     def run_v():
-        common.set_gpu(gpus[-1]); t0 = time.time(); res["v"] = common.protenix_fold(cands[["id", "seq"]], t, outdir / "v2", arm="v2", seed=seeds[0]); T.add(f"5_v2_{tag}", time.time() - t0)
-    if len(gpus) > 1:                                                       # Boltz seeds on gpus[:-1], Protenix-v2 on the last GPU, at the same time
+        t0 = time.time()
+        if oracle2 == "protenix-v2":
+            common.set_gpu(gpus[-1]); res["v"] = common.protenix_fold(cands[["id", "seq"]], t, outdir / "v2", arm="v2", seed=seeds[0]); T.add(f"5_v2_{tag}", time.time() - t0)
+        elif oracle2 == "af3":                     # every GPU pulls designs from one queue; the GPU Boltz-2 is using joins when Boltz-2 is done
+            hold = {gpus[0]: boltz_done} if len(gpus) > 1 and gpus[0] is not None else None
+            res["v"] = oracles.af3_fold(cands[["id", "seq"]], t, outdir / "af3", seed=seeds[0], gpus=gpus, hold=hold); T.add(f"5_af3_{tag}", time.time() - t0); T.add(f"5_af3_gpu_s_{tag}", res["v"].attrs.get("gpu_seconds", 0.0))
+        else: raise ValueError(f"unknown second oracle {oracle2!r}; choose from {oracles.ORACLES}")
+    if len(gpus) > 1:                                                       # Boltz seeds on gpus[:-1], second oracle on the last GPU (AF3: on all), at the same time
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(2) as ex: list(ex.map(lambda f: f(), [run_b, run_v]))
     else: run_b(); run_v()
     b, v = res["b"], res["v"]
     d = cands.merge(b, on="id", how="left").merge(v, on="id", how="left")
-    d["b_gate"] = (d.b_ipsae >= 0.5) & (d.b_paemin <= 2.0); d["v2_pass"] = d.v2_ipsae >= 0.5; d["consensus_pass"] = d.b_gate & d.v2_pass
-    d["consensus"] = d[["b_ipsae", "v2_ipsae"]].min(axis=1)
+    d["o2_name"] = oracle2
+    d["b_gate"] = (d.b_ipsae >= 0.5) & (d.b_paemin <= 2.0); d["v2_pass"] = d.v2_ipsae >= o2_gate; d["consensus_pass"] = d.b_gate & d.v2_pass
+    d["consensus_min"] = oracles.consensus_score(d, ("b_ipsae", "v2_ipsae"), "min")                                  # gate-style: worst judge
+    d["rank_rule"] = rank_rule; d["consensus"] = oracles.consensus_score(d, ("b_ipsae", "v2_ipsae"), rank_rule)       # what the shortlist is ordered by
     hc = [common.hotspot_contacts(r.b_cif, len(t["seq"]), t["hotspot_idx"]) if isinstance(r.b_cif, str) else (float("nan"), 0) for r in d.itertuples()]
     d["hotspot_frac"] = [h[0] for h in hc]; d["hotspot_n"] = [h[1] for h in hc]
     if t.get("site_dir"):                                  # ligand-site occlusion (e.g. FimH mannose pocket)
@@ -231,13 +247,45 @@ def shortlist(d, top, thr=0.6):
         if len(keep) >= top: break
     return pd.DataFrame(keep).drop(columns="Index", errors="ignore")
 
-def finalize_variant(t, out, tag, src, final_m, top, T, state, force, gpus=None):
+def finalize_variant(t, out, tag, src, final_m, top, T, state, force, gpus=None, judge=None):
+    judge = judge or dict(seeds=(1, 2, 3), oracle2="protenix-v2", o2_gate=0.5, rank_rule="min")
     c = src.sort_values("fast_ipsae", ascending=False).head(final_m)[["id", "seq"]].copy(); cf = out / f"consensus_{tag}.csv"
     if cf.exists() and not force and set(pd.read_csv(cf).id) == set(c.id) and (out / f"final_{tag}.csv").exists():
+        d = pd.read_csv(cf)
+        if (d["rank_rule"].iloc[0] if "rank_rule" in d else "min") != judge["rank_rule"]:               # predictions are final; only the ordering changes -> cheap
+            d["consensus_min"] = oracles.consensus_score(d, ("b_ipsae", "v2_ipsae"), "min"); d["rank_rule"] = judge["rank_rule"]
+            d["consensus"] = oracles.consensus_score(d, ("b_ipsae", "v2_ipsae"), judge["rank_rule"]); save_csv(d, cf); save_csv(shortlist(d, top), out / f"final_{tag}.csv")
+            log(f"[{tag}] predictions reused; re-ranked by {judge['rank_rule']}"); return
         log(f"[{tag}] already complete for these {len(c)} candidates"); return
-    d = consensus(t, c, out / f"consensus_{tag}", (1, 2, 3), T, tag, gpus); save_csv(d, cf); s = shortlist(d, top); save_csv(s, out / f"final_{tag}.csv")
+    d = consensus(t, c, out / f"consensus_{tag}", judge["seeds"], T, tag, gpus, judge["oracle2"], judge["o2_gate"], judge["rank_rule"]); save_csv(d, cf); s = shortlist(d, top); save_csv(s, out / f"final_{tag}.csv")
     state.mark(f"consensus_{tag}", "done", evaluated=len(d), passed=int(d.consensus_pass.sum()), shortlist=len(s))
     log(f"[{tag}] consensus-pass {int(d.consensus_pass.sum())}/{len(d)} of the top-{final_m}; shortlist {len(s)}; best consensus {d.consensus.max():.3f}")
+
+JUDGE_SPECIFIC = ("consensus_", "final_")               # prefixes of per-judge outputs; everything else in a run folder is judge-independent
+
+def fork_run(src, dst, judge_cfg=None):
+    """Start run folder `dst` from the judge-independent work of `src` (generation, design, fast screen, cycling): files are hard-linked, so it costs no
+    disk and no GPU time, and a second judge sees exactly the same candidates. Boltz-2 seed predictions are linked too, so a judge that reuses seed 1
+    does not fold it again. Timers and stage state of the judging stages are NOT carried over (each judge reports its own cost)."""
+    src, dst = Path(src), Path(dst)
+    if not (src / "run_config.json").exists(): raise SystemExit(f"--fork-from {src}: not a run folder (no run_config.json)")
+    if dst.exists() and any(dst.iterdir()): raise SystemExit(f"--fork-from needs an empty or new --out, found files in {dst}")
+    dst.mkdir(parents=True, exist_ok=True)
+    def link(a, b):
+        try: os.link(a, b)
+        except OSError: shutil.copy2(a, b)                                  # different filesystem
+    for item in sorted(src.iterdir()):
+        if item.name.startswith(JUDGE_SPECIFIC) or item.name in ("final_design", "run_args.json", "run_state.json", "timers.json", "run_config.json"): continue
+        if item.is_dir(): shutil.copytree(item, dst / item.name, copy_function=link)
+        else: link(item, dst / item.name)
+    for cdir in sorted(src.glob("consensus_*")):                           # share Boltz-2 predictions only (the other judge's predictions are not ours)
+        if cdir.is_dir() and (cdir / "boltz").is_dir(): shutil.copytree(cdir / "boltz", dst / cdir.name / "boltz", copy_function=link)
+    cfg = json.load(open(src / "run_config.json")); [cfg.pop(k, None) for k in LEGACY]; cfg.update(judge_cfg or {}); save_json(cfg, dst / "run_config.json")      # the fork is bound to the judge it was made for
+    st = json.load(open(src / "run_state.json")) if (src / "run_state.json").exists() else {"stages": {}}
+    st["stages"] = {k: v for k, v in st["stages"].items() if not k.startswith(("consensus_", "complete"))}; save_json(st, dst / "run_state.json")
+    tm = json.load(open(src / "timers.json")) if (src / "timers.json").exists() else {}
+    save_json({k: v for k, v in tm.items() if not k.startswith("5_")}, dst / "timers.json")
+    log(f"forked {src} -> {dst}: judge-independent stages linked, judging stages left to run")
 
 def print_status(out):
     out = Path(out); st = json.load(open(out / "run_state.json")) if (out / "run_state.json").exists() else {"stages": {}}
@@ -262,14 +310,22 @@ def main():
     ap.add_argument("--mpnn-weights", default="soluble", choices=["soluble", "original"]); ap.add_argument("--mpnn-bias", default="none", help="none | iface | iface:SCALE  (interface-only hydrophobic/aromatic logit bias, SCALE multiplies it)")
     ap.add_argument("--designs-csv", help="skip generation + MPNN: screen these sequences (columns: seq, [bb], [id])")
     ap.add_argument("--gpus", default=None, help="comma list, e.g. 0,1,2,3 (or $FUNNEL_GPUS): units run in parallel, one worker per GPU; seeds of the consensus run on separate GPUs")
+    ap.add_argument("--judge", default="legacy", choices=sorted(JUDGES), help="legacy: Boltz-2 x3 seeds + Protenix-v2 (as published). new: Boltz-2 x1 + AlphaFold3 x1 (needs $PXD_AF3_*). Opt-in until validated on your targets")
+    ap.add_argument("--second-oracle", choices=oracles.ORACLES, help="override the judge's second model"); ap.add_argument("--boltz-seeds", help="override the Boltz-2 seeds, e.g. 1,2,3")
+    ap.add_argument("--rank-rule", choices=oracles.RANK_RULES[:2], help="order the shortlist by min (worst judge) or mean of the two ipSAE values; default per judge (legacy: min, new: mean). Changing it re-ranks finished predictions without recomputing")
+    ap.add_argument("--o2-gate", type=float, default=0.5, help="ipSAE gate on the second oracle. 0.5 was set for Protenix-v2; not calibrated for other models")
+    ap.add_argument("--fork-from", help="start --out from the judge-independent stages of this finished run (hard links) so two judges compare on identical candidates")
     ap.add_argument("--force", action="store_true", help="redo finished units"); ap.add_argument("--allow-config-change", action="store_true")
     a = ap.parse_args(); out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     if a.status: return print_status(out)
     if not a.target: ap.error("--target is required")
+    jd = JUDGES[a.judge]; second = a.second_oracle or jd["second_oracle"]; bseeds = a.boltz_seeds or jd["boltz_seeds"]
+    if a.fork_from: fork_run(a.fork_from, out, dict(judge=a.judge, second_oracle=second, boltz_seeds=bseeds))
+    judge = dict(seeds=tuple(int(x) for x in bseeds.split(",")), oracle2=second, o2_gate=a.o2_gate, rank_rule=a.rank_rule or jd["rank_rule"])
     t = common.load_target(a.target); T = Timers(out / "timers.json"); state = RunState(out / "run_state.json")
     sha = hashlib.sha1(open(a.designs_csv, "rb").read()).hexdigest()[:12] if a.designs_csv else None
     cfg = dict(target=t["name"], hotspot_idx=t["hotspot_idx"], binder_length=t["binder_length"], chunk=a.chunk, steps=a.steps, seqs=a.seqs, mpnn_weights=a.mpnn_weights, mpnn_bias=a.mpnn_bias,
-               cycle_scope=a.cycle_scope, designs_csv_sha=sha, n_backbones=a.n_backbones, rounds=a.rounds, final_m=a.final_m, top=a.top, started=time.strftime("%Y-%m-%d %H:%M:%S"))
+               cycle_scope=a.cycle_scope, designs_csv_sha=sha, judge=a.judge, second_oracle=second, boltz_seeds=bseeds, n_backbones=a.n_backbones, rounds=a.rounds, final_m=a.final_m, top=a.top, started=time.strftime("%Y-%m-%d %H:%M:%S"))
     check_config(out, cfg, a.allow_config_change); gpus = common.gpu_list(a.gpus); log("GPUs:", gpus)
     log(f"target {t['name']}: {len(t['seq'])} aa, hotspots {t['hotspots']} -> shard idx {t['hotspot_idx']}, binder {t['binder_length']} aa")
     mp = (a.mpnn_weights, a.mpnn_bias)
@@ -282,7 +338,7 @@ def main():
         save_csv(st_, out / "start_parents.csv")
     start = pd.read_csv(out / "start_parents.csv")
     for tag, src in ([] if a.no_cycle_ablation else [("nocycle", start)]) + ([("cycled", parents)] if parents is not None else []):
-        finalize_variant(t, out, tag, src, a.final_m, a.top, T, state, a.force, gpus)
+        finalize_variant(t, out, tag, src, a.final_m, a.top, T, state, a.force, gpus, judge)
     save_json(dict(vars(a), command=" ".join(sys.argv), finished=time.strftime("%Y-%m-%d %H:%M:%S")), out / "run_args.json")
     try:
         import final_design; final_design.build(out, a.target, a.top)          # review package: out/final_design/

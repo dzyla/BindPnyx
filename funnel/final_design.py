@@ -23,6 +23,15 @@ REPO = common.REPO
 BLUE, VERM, GREEN, GREY, SKY = "#0072B2", "#D55E00", "#009E73", "#8a8a8a", "#56B4E9"
 plt.rcParams.update({"font.size": 9, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": "#e6e6e6", "axes.axisbelow": True, "figure.dpi": 130, "savefig.bbox": "tight"})
 
+O2_LABEL = {"protenix-v2": "Protenix-v2", "af3": "AlphaFold3"}
+
+def o2_label(ev):
+    """Display name of the second oracle (columns are called v2_* whichever model produced them; run folders written before --judge existed have no o2_name)."""
+    n = ev["o2_name"].iloc[0] if "o2_name" in ev and len(ev) else "protenix-v2"
+    return O2_LABEL.get(n, n)
+
+def n_boltz_seeds(ev): return int(ev["b_nseeds"].max()) if "b_nseeds" in ev and len(ev) else 3
+
 def _p(x):
     x = Path(str(x)); return x if x.is_absolute() else REPO / x
 
@@ -93,7 +102,7 @@ def build(out, target_name, top=20, variant="auto"):
 def _stats(t, sl, ev, screen, gen, timers, args, variant, hs):
     S = dict(target=t["name"], variant=variant, hotspots=t["hotspots"], hotspot_idx=t["hotspot_idx"], binder_length=t["binder_length"], target_length=len(t["seq"]))
     S["settings"] = args; S["timers_s"] = {k: round(v) for k, v in timers.items()}
-    keep = ("1_generate", "2_mpnn", "3_fast_screen") + (("4_cycling",) if variant == "cycled" else ()) + (f"5_boltz_{variant}", f"5_v2_{variant}")
+    keep = ("1_generate", "2_mpnn", "3_fast_screen") + (("4_cycling",) if variant == "cycled" else ()) + (f"5_boltz_{variant}", f"5_v2_{variant}", f"5_af3_{variant}")
     S["gpu_hours_this_variant"] = round(sum(timers.get(k, 0) for k in keep) / 3600, 2)
     S["counts"] = dict(backbones=gen.get("n"), designs_screened=int(len(screen)), screened_ok=int(screen.fast_ok.sum()) if "fast_ok" in screen else None,
                        evaluated_expensive=int(len(ev)), consensus_pass=int(ev.consensus_pass.sum()), boltz_gate=int(ev.b_gate.sum()), v2_pass=int(ev.v2_pass.sum()),
@@ -116,7 +125,7 @@ def _plots(fd, t, sl, ev, screen, gen, timers, hs, out, variant):
     P = fd / "plots"
     # 1 funnel yield
     n = [("backbones generated", gen.get("n")), ("sequences designed (MPNN)", len(screen) or None), ("fast-screened", int(screen.fast_ok.sum()) if "fast_ok" in screen else None),
-         ("given Boltz-2 + Protenix-v2", len(ev)), ("pass both models", int(ev.consensus_pass.sum())), ("shortlist (de-duplicated)", len(sl))]
+         (f"given Boltz-2 + {o2_label(ev)}", len(ev)), ("pass both models", int(ev.consensus_pass.sum())), ("shortlist (de-duplicated)", len(sl))]
     n = [(a, b) for a, b in n if b]; fig, ax = plt.subplots(figsize=(7.4, 3.3)); y = np.arange(len(n))[::-1]
     ax.barh(y, [b for _, b in n], color=[GREY, GREY, SKY, BLUE, GREEN, VERM][:len(n)], height=.62); ax.set_xscale("log"); ax.set_yticks(y); ax.set_yticklabels([a for a, _ in n])
     for yy, (_, b) in zip(y, n): ax.text(b * 1.08, yy, f"{b:,}", va="center", fontsize=9)
@@ -128,7 +137,7 @@ def _plots(fd, t, sl, ev, screen, gen, timers, hs, out, variant):
     for tr, m, c in (("A", "o", GREEN), ("B", "s", BLUE), ("C", "^", VERM)):
         g = b[b.tier == tr]
         if len(g): ax.scatter(g.b_ipsae, g.v2_ipsae, s=62, marker=m, c=c, edgecolor="k", linewidth=.6, label=f"shortlist tier {tr} ({len(g)})")
-    ax.axvline(.5, c="#444", lw=.8, ls="--"); ax.axhline(.5, c="#444", lw=.8, ls="--"); ax.set_xlabel("Boltz-2 ipSAE (mean of seeds)"); ax.set_ylabel("Protenix-v2 ipSAE"); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    ax.axvline(.5, c="#444", lw=.8, ls="--"); ax.axhline(.5, c="#444", lw=.8, ls="--"); ax.set_xlabel("Boltz-2 ipSAE (mean of seeds)"); ax.set_ylabel(f"{o2_label(ev)} ipSAE"); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
     ax.set_title("Two independent predictors (dashed = 0.5 gate)", loc="left"); ax.legend(frameon=False, fontsize=7.5, loc="lower right"); fig.savefig(P / "02_scores_scatter.png"); plt.close(fig)
     # 3 heatmap of the shortlist
     cols = [("b_ipsae", "Boltz ipSAE", 1), ("v2_ipsae", "v2 ipSAE", 1), ("b_iptm", "Boltz ipTM", 1), ("b_paemin", "interface PAE (A)", -1), ("hotspot_frac", "hotspots contacted", 1), ("pisa_sc", "shape compl.", 1),
@@ -161,7 +170,7 @@ def _plots(fd, t, sl, ev, screen, gen, timers, hs, out, variant):
         ax.set_xticks(range(n_)); ax.set_xticklabels(sl["rank"], fontsize=7); ax.set_yticks(range(n_)); ax.set_yticklabels(sl["rank"], fontsize=7); ax.set_title(f"Pairwise sequence identity (mean {I[np.triu_indices(n_, 1)].mean():.2f})", loc="left", fontsize=9); fig.colorbar(im, ax=ax, shrink=.8); fig.savefig(P / "06_diversity.png"); plt.close(fig)
     # 7 seed stability
     fig, ax = plt.subplots(figsize=(7.2, 3.3)); x = np.arange(len(sl))
-    ax.errorbar(x, sl.b_ipsae, yerr=sl.get("b_ipsae_sd", 0), fmt="o", color=BLUE, capsize=2, label="Boltz-2 mean +- SD over seeds"); ax.plot(x, sl.v2_ipsae, "s", color=GREEN, label="Protenix-v2 (1 seed)")
+    ax.errorbar(x, sl.b_ipsae, yerr=sl.get("b_ipsae_sd", 0), fmt="o", color=BLUE, capsize=2, label="Boltz-2 mean +- SD over seeds"); ax.plot(x, sl.v2_ipsae, "s", color=GREEN, label=f"{o2_label(ev)} (1 seed)")
     ax.axhline(.5, c="#444", lw=.8, ls="--"); ax.set_xticks(x); ax.set_xticklabels(sl["rank"]); ax.set_xlabel("shortlist rank"); ax.set_ylabel("ipSAE"); ax.set_ylim(0, 1); ax.legend(frameon=False, fontsize=8, ncol=2, loc="lower left"); ax.set_title("Score stability across seeds", loc="left"); fig.savefig(P / "07_seed_stability.png"); plt.close(fig)
     # 8 cycling
     cp, sp = out / "cycled_parents.csv", out / "start_parents.csv"
@@ -185,10 +194,10 @@ def _report(t, sl, ev, S, variant, hs):
          f"- **Target:** {t['description']}", f"- **Requested site:** {', '.join(t['hotspots'])} (shard indices {t['hotspot_idx']}); binder length {t['binder_length']}; target construct {S['target_length']} aa",
          f"- **Strategy:** funnel, variant **{variant}** ({'with' if variant == 'cycled' else 'without'} refold-redesign cycling); GPU time for this variant **{S['gpu_hours_this_variant']} h**",
          f"- **Result:** {c['consensus_pass']} of {c['evaluated_expensive']} designs given the expensive models pass both judges; shortlist of {c['shortlist']} de-duplicated designs, of which {c['shortlist_consensus_pass']} pass; tiers {S['tiers']}",
-         f"- **Pass rule:** Boltz-2 mean ipSAE >= 0.5 and interface PAE <= 2 A, **and** Protenix-v2 ipSAE >= 0.5", ""]
+         f"- **Pass rule:** Boltz-2 mean ipSAE >= 0.5 and interface PAE <= 2 A, **and** {o2_label(ev)} ipSAE >= 0.5", ""]
     L += ["## 2. Stage counts and time", "", "| stage | count | seconds |", "|---|---|---|"]
     tm = S["timers_s"]; rows = [("backbones generated", c["backbones"], tm.get("1_generate")), ("MPNN sequences", c["designs_screened"], tm.get("2_mpnn")), ("fast screen (Protenix 0.5-mini)", c["screened_ok"], tm.get("3_fast_screen")),
-                                ("cycling", "" , tm.get("4_cycling")), (f"Boltz-2 (3 seeds)", c["evaluated_expensive"], tm.get(f"5_boltz_{variant}")), ("Protenix-v2", c["evaluated_expensive"], tm.get(f"5_v2_{variant}"))]
+                                ("cycling", "" , tm.get("4_cycling")), (f"Boltz-2 ({n_boltz_seeds(ev)} seed{'s' if n_boltz_seeds(ev) != 1 else ''})", c["evaluated_expensive"], tm.get(f"5_boltz_{variant}")), (o2_label(ev), c["evaluated_expensive"], tm.get(f"5_v2_{variant}", tm.get(f"5_af3_{variant}")))]
     L += [f"| {a} | {b if b is not None else ''} | {s if s is not None else ''} |" for a, b, s in rows]
     L += ["", "![funnel](plots/01_funnel_yield.png)", ""]
     L += ["## 3. Shortlist", "", "| rank | id | tier | Boltz ipSAE | v2 ipSAE | PAE min (A) | hotspots | SC | area (A2) | H-bonds | arom. contacts | flags | sequence |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
@@ -199,7 +208,7 @@ def _report(t, sl, ev, S, variant, hs):
           "![heatmap](plots/03_design_heatmap.png)", "", "![scatter](plots/02_scores_scatter.png)", ""]
     if len(hs): L += ["![hotspots](plots/04_hotspot_burial.png)", ""]
     L += ["## 4. Statistics for review", "", "| quantity | median | min | max |", "|---|---|---|---|"]
-    names = dict(b_ipsae="Boltz-2 ipSAE", v2_ipsae="Protenix-v2 ipSAE", b_paemin="interface PAE (A)", hotspot_frac="hotspot fraction contacted", pisa_sc="shape complementarity", pisa_interface_area="interface area (A2)", KE="Lys+Glu fraction", aromatic="aromatic fraction", hydrophobic="hydrophobic fraction")
+    names = dict(b_ipsae="Boltz-2 ipSAE", v2_ipsae=f"{o2_label(ev)} ipSAE", b_paemin="interface PAE (A)", hotspot_frac="hotspot fraction contacted", pisa_sc="shape complementarity", pisa_interface_area="interface area (A2)", KE="Lys+Glu fraction", aromatic="aromatic fraction", hydrophobic="hydrophobic fraction")
     L += [f"| {names[k]} | {v[0]:.3g} | {v[1]:.3g} | {v[2]:.3g} |" for k, v in sh.items()]
     L += ["", f"- **Diversity:** {S['clusters_60pct']} sequence clusters (60% identity) among {len(sl)} designs; mean pairwise identity {S['pairwise_identity_mean']:.2f}" if S["pairwise_identity_mean"] is not None else "",
           f"- **Quality flags** (fastPISA / shape complementarity; advisory only): {S['flags'] if S['flags'] else 'none'}",
@@ -208,7 +217,7 @@ def _report(t, sl, ev, S, variant, hs):
           "![composition](plots/05_composition.png)", "", "![diversity](plots/06_diversity.png)", "", "![stability](plots/07_seed_stability.png)", ""]
     if variant == "cycled": L += ["![cycling](plots/08_cycling.png)", ""]
     L += ["## 5. Recommendation from the adaptive rule", "",
-          f"Top-20 pass fraction **{rule['top20_pass_fraction']:.2f}**, Protenix-v2 median **{rule['v2_median']:.2f}**. " + ("**Re-run with `--rounds 3`** (stages 1-3 are reused) - the no-cycling shortlist is below the 90% / 0.7 bar." if rule["recommend_cycling"] else "No further cycling is indicated by the rule."), "",
+          f"Top-20 pass fraction **{rule['top20_pass_fraction']:.2f}**, {o2_label(ev)} median **{rule['v2_median']:.2f}**. " + ("**Re-run with `--rounds 3`** (stages 1-3 are reused) - the no-cycling shortlist is below the 90% / 0.7 bar." if rule["recommend_cycling"] else "No further cycling is indicated by the rule."), "",
           "## 6. How to review", "",
           "1. Open `view_pymol.pml` (or `view_chimerax.cxc`): target grey, binders coloured by rank, requested hotspots as red sticks. Check the binder sits on the intended face and does not clash.",
           "2. Read the flags: *no aromatic contact*, *polar interface*, *few H-bonds*, *thin interface*, *low shape complementarity* are triage hints, validated only weakly (see docs/RECOMMENDATIONS.md section 7).",

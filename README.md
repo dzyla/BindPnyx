@@ -71,6 +71,10 @@ One GPU job at a time. Worked target definitions: `funnel/targets/{pdl1,mdm2,fim
 - **Several GPUs:** `--gpus 0,1,2,3` (or `GPUS=0,1,2,3 funnel/run_overnight.sh`): chunks and screening units run in parallel, cycling refolds are sharded, the three Boltz seeds run on separate GPUs
   and Protenix-v2 on another (designs are never split inside a Boltz batch).
 
+## Judge regimes
+
+`--judge legacy` (default) is the published consensus: Boltz-2 x3 seeds + Protenix-v2. `--judge new` uses one Boltz-2 seed + one AlphaFold3 seed and orders the shortlist by the mean of the two ipSAE values; `--fork-from` runs it on exactly the candidates of a finished legacy run. What the wet-lab-labelled release data does and does not show, the AlphaFold3 setup and the fair-comparison protocol: [docs/JUDGE_REGIME.md](docs/JUDGE_REGIME.md).
+
 ## Design routes
 
 | route | command | status |
