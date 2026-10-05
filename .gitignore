@@ -5,7 +5,8 @@ __pycache__/
 .pxd/
 checkpoints/
 release_data
-data/
+# anchored: an unanchored `data/` also matched colabdesign/af/alphafold/data (a vendored python package) and silently dropped it from the repo
+/data/
 out/
 *.pkl.gz
 *.a3m
