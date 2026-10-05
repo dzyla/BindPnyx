@@ -2,7 +2,8 @@
 
 Why this exists: on the 1,320 wet-lab-labelled designs of the Anthropic binder-design release, Boltz-2 alone ranks mid-pack among ten co-folding models
 (within-target AUROC 0.70), and a second, architecturally different model adds more than extra Boltz seeds do (see docs/JUDGE_REGIME.md and
-tests/test_consensus_regime.py for the pinned numbers). The legacy second oracle is Protenix-v2 (funnel/common.py:protenix_fold). This module adds AlphaFold3
+tests/test_consensus_regime.py for the pinned numbers). THAT FINDING used OpenFold3 as the second model; AlphaFold3 itself has not been calibrated against the
+release labels (docs/JUDGE_REGIME.md). The legacy second oracle is Protenix-v2 (funnel/common.py:protenix_fold). This module adds AlphaFold3
 (real weights, MSA injected, no data pipeline) behind the same interface and the shared pure helpers: the consensus rule, input/naming helpers and the
 PAE -> ipSAE parser.
 

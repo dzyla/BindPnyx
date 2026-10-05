@@ -59,7 +59,9 @@ GUARD = ("target", "hotspot_idx", "binder_length", "chunk", "steps", "seqs", "mp
          "judge", "second_oracle", "boltz_seeds")      # rank_rule is NOT guarded: it only re-orders finished predictions
 # What a run folder started before --judge existed means. Without this, `--judge new` on such a folder would silently mix two judges in one consensus table.
 LEGACY = dict(judge="legacy", second_oracle="protenix-v2", boltz_seeds="1,2,3")      # rank_rule: "min"
-# judge regime -> defaults. `new` = ONE Boltz-2 seed + ONE AlphaFold3 seed (two architectures beat three Boltz seeds at lower cost on the release benchmark).
+# judge regime -> defaults. `new` = ONE Boltz-2 seed + ONE second-oracle seed: on the release benchmark, Boltz-2 x1 + a second architecture beats Boltz-2 x3 at lower
+# cost (docs/JUDGE_REGIME.md). That benchmark used OpenFold3 weights as the second oracle, not AlphaFold3 -- af3 is the default here for practical reasons (real weights,
+# already wired up) but is UNCALIBRATED on the release; treat `new` as opt-in until it is checked on labelled designs, same as the --judge help text says.
 JUDGES = {"legacy": dict(second_oracle="protenix-v2", boltz_seeds="1,2,3", rank_rule="min"), "new": dict(second_oracle="af3", boltz_seeds="1", rank_rule="mean")}
 def check_config(out, cfg, allow):
     f = out / "run_config.json"
