@@ -5,11 +5,11 @@ For the next agent (or person) picking this up on a new workstation. Read `AGENT
 
 ## 0. Where things are
 - Public repo (pushed 2026-10-05, commit `f37d8f4`, AGPL-3.0): https://github.com/dzyla/binder-design , branch `main`. It is a **clean export** (no structures, MSAs, run outputs, private notes, original git history).
-- The old workstation's working tree (`/mnt/scratch/pxdesign_local`) holds data that is **not** in the repo and will be lost unless copied: `out/` (all run outputs, FimH/PD-L1/MDM2 final_design folders, judge/controls tables, calibration CSVs),
+- The old workstation's working tree (the original development directory) holds data that is **not** in the repo and will be lost unless copied: `out/` (all run outputs, FimH/PD-L1/MDM2 final_design folders, judge/controls tables, calibration CSVs),
   `data/targets/` (rebuildable with `funnel/fetch_target.py`), `.pxd/` (environments, rebuildable), `.archive/` (old docs/scripts), `checkpoints/` (weights, not redistributable).
   If the owner wants the numbers behind `docs/OVERNIGHT_RESULTS.md` reproducible without re-running, copy `out/judge`, `out/controls`, `out/funnel/*/final_design` and `out/calib`.
 - **Development now happens in a clone of the GitHub repo.** Do NOT re-run `scripts/export_public.py` from a private tree to publish again (it creates an unrelated history). In the clone, run `python scripts/check_public.py` before every push.
-- This handoff file was written after the push and has not been pushed; it is in the old working tree (`docs/HANDOFF.md`). The owner should commit it.
+- This handoff file was written after the push and has not been pushed; it is as `docs/HANDOFF.md`. The owner should commit it.
 
 ## 1. Bring-up on the new machine (do this first)
 ```bash
