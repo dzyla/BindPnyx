@@ -7,6 +7,7 @@ BoltzBackend through $PXDBENCH_BACKEND gave it Protenix diffusion config and onl
 ran it when eval_protenix_mini was set.
 """
 import pytest
+pytest.importorskip("biotite", reason="needs the full pxd environment (biotite)")
 
 from pxdbench.tasks.base import BaseTask
 from pxdbench.tasks.binder import BinderTask

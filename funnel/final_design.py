@@ -23,7 +23,7 @@ REPO = common.REPO
 BLUE, VERM, GREEN, GREY, SKY = "#0072B2", "#D55E00", "#009E73", "#8a8a8a", "#56B4E9"
 plt.rcParams.update({"font.size": 9, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": "#e6e6e6", "axes.axisbelow": True, "figure.dpi": 130, "savefig.bbox": "tight"})
 
-O2_LABEL = {"protenix-v2": "Protenix-v2", "af3": "AlphaFold3"}
+O2_LABEL = {"protenix-v2": "Protenix-v2", "af3": "AlphaFold3", "of3": "OpenFold3"}
 
 def o2_label(ev):
     """Display name of the second oracle (columns are called v2_* whichever model produced them; run folders written before --judge existed have no o2_name)."""
@@ -39,11 +39,14 @@ def comp(seq):
     n = len(seq); f = lambda a: sum(seq.count(c) for c in a) / n
     return dict(KE=f("KE"), aromatic=f("FWY"), hydrophobic=f("AILMFVW"), net_charge=seq.count("K") + seq.count("R") - seq.count("D") - seq.count("E"))
 
+JN, JL, JF = "v2", "Protenix-v2", "protenixv2"      # second judge of the table being reported: column prefix, display label, file suffix (set in build())
+JUDGE_NAMES = {"v2": ("Protenix-v2", "protenixv2"), "of3": ("OpenFold3", "openfold3")}
+
 def tier(r):
     """A: both models >=0.7, interface PAE <=1 A, >=80% of hotspots contacted, no quality flag.  B: passes both judges (any flag, or lower scores).  C: everything else.
     Historical reference only: on 206 wet-lab-labelled designs 'both models >= 0.7' had a 75% binder rate (a balanced set, so absolute rates are NOT transferable)."""
     flags = isinstance(r.get("pisa_flags"), str) and r["pisa_flags"] != ""
-    if r["consensus_pass"] and r["b_ipsae"] >= .7 and r["v2_ipsae"] >= .7 and r["b_paemin"] <= 1.0 and r["hotspot_frac"] >= .8 and not flags: return "A"
+    if r["consensus_pass"] and r["b_ipsae"] >= .7 and r[f"{r.get('second_judge', 'v2')}_ipsae"] >= .7 and r["b_paemin"] <= 1.0 and r["hotspot_frac"] >= .8 and not flags: return "A"
     return "B" if r["consensus_pass"] else "C"
 
 def build(out, target_name, top=20, variant="auto"):
@@ -51,6 +54,8 @@ def build(out, target_name, top=20, variant="auto"):
     for sub in ("models", "plots"): (fd / sub).mkdir(parents=True)
     if variant == "auto": variant = "cycled" if (out / "final_cycled.csv").exists() else "nocycle"
     ev = pd.read_csv(out / f"consensus_{variant}.csv"); sl = pd.read_csv(out / f"final_{variant}.csv").head(top).copy()
+    global JN, JF; JN = "v2"       # the second oracle's columns are always v2_* (whichever model produced them; ev["o2_name"] says which)
+    JF = {"protenix-v2": "protenixv2", "af3": "af3", "of3": "openfold3"}.get(ev["o2_name"].iloc[0] if "o2_name" in ev and len(ev) else "protenix-v2", "oracle2")
     timers = json.load(open(out / "timers.json")) if (out / "timers.json").exists() else {}
     screen = pd.read_csv(out / "screen.csv") if (out / "screen.csv").exists() else pd.DataFrame()
     gen = json.load(open(out / "gen/converted.json")) if (out / "gen/converted.json").exists() else {}
@@ -64,7 +69,7 @@ def build(out, target_name, top=20, variant="auto"):
         f = screen.set_index("id")["fast_ipsae"].to_dict(); sl["fast_ipsae_at_screen"] = sl.id.map(f)
     # ---- models
     for r in sl.itertuples():
-        for key, suf in (("b_cif", "boltz2"), ("v2_cif", "protenixv2")):
+        for key, suf in (("b_cif", "boltz2"), (f"{JN}_cif", JF)):
             src = getattr(r, key, None)
             if isinstance(src, str) and _p(src).exists():
                 dst = fd / "models" / f"rank{r.rank:02d}_{r.id}_{suf}.cif"; shutil.copy2(_p(src), dst)
@@ -102,12 +107,12 @@ def build(out, target_name, top=20, variant="auto"):
 def _stats(t, sl, ev, screen, gen, timers, args, variant, hs):
     S = dict(target=t["name"], variant=variant, hotspots=t["hotspots"], hotspot_idx=t["hotspot_idx"], binder_length=t["binder_length"], target_length=len(t["seq"]))
     S["settings"] = args; S["timers_s"] = {k: round(v) for k, v in timers.items()}
-    keep = ("1_generate", "2_mpnn", "3_fast_screen") + (("4_cycling",) if variant == "cycled" else ()) + (f"5_boltz_{variant}", f"5_v2_{variant}", f"5_af3_{variant}")
+    keep = ("1_generate", "2_mpnn", "3_fast_screen") + (("4_cycling",) if variant == "cycled" else ()) + (f"5_boltz_{variant}", f"5_v2_{variant}", f"5_af3_{variant}", f"5_of3_{variant}")
     S["gpu_hours_this_variant"] = round(sum(timers.get(k, 0) for k in keep) / 3600, 2)
     S["counts"] = dict(backbones=gen.get("n"), designs_screened=int(len(screen)), screened_ok=int(screen.fast_ok.sum()) if "fast_ok" in screen else None,
-                       evaluated_expensive=int(len(ev)), consensus_pass=int(ev.consensus_pass.sum()), boltz_gate=int(ev.b_gate.sum()), v2_pass=int(ev.v2_pass.sum()),
+                       evaluated_expensive=int(len(ev)), consensus_pass=int(ev.consensus_pass.sum()), boltz_gate=int(ev.b_gate.sum()), second_judge=JN, judge_pass=int(ev[f"{JN}_pass"].sum()),
                        shortlist=int(len(sl)), shortlist_consensus_pass=int(sl.consensus_pass.sum()))
-    S["shortlist"] = {k: (float(sl[k].median()), float(sl[k].min()), float(sl[k].max())) for k in ("b_ipsae", "v2_ipsae", "b_paemin", "hotspot_frac", "pisa_sc", "pisa_interface_area", "KE", "aromatic", "hydrophobic") if k in sl}
+    S["shortlist"] = {k: (float(sl[k].median()), float(sl[k].min()), float(sl[k].max())) for k in ("b_ipsae", f"{JN}_ipsae", "b_paemin", "hotspot_frac", "pisa_sc", "pisa_interface_area", "KE", "aromatic", "hydrophobic") if k in sl}
     S["tiers"] = sl.tier.value_counts().to_dict(); S["tiers_evaluated"] = ev.tier.value_counts().to_dict()
     S["flags"] = sl.pisa_flags.fillna("").str.split(";").explode().replace("", np.nan).dropna().value_counts().to_dict() if "pisa_flags" in sl else {}
     S["clusters_60pct"] = common.cluster_count(sl.seq.tolist(), 0.6); S["pairwise_identity_mean"] = float(np.mean([common.identity(a, b) for i, a in enumerate(sl.seq) for b in sl.seq[i + 1:]])) if len(sl) > 1 else None
@@ -117,8 +122,8 @@ def _stats(t, sl, ev, screen, gen, timers, args, variant, hs):
         ok = e.dropna(subset=[fcol, "consensus"]); S["screen_vs_consensus_spearman_within_top60"] = float(spearmanr(ok[fcol], ok.consensus)[0]) if len(ok) > 5 else None
     S["hotspot_bsa_A2_median_per_residue"] = dict(zip(t["hotspots"], np.median(np.array(hs), axis=0).round(1).tolist())) if len(hs) else None
     # adaptive rule from the docs
-    top20 = sl.head(20); S["adaptive_rule"] = dict(top20_pass_fraction=float(top20.consensus_pass.mean()), v2_median=float(top20.v2_ipsae.median()),
-                                                   recommend_cycling=bool(top20.consensus_pass.mean() < 0.9 or top20.v2_ipsae.median() < 0.7) and variant == "nocycle")
+    top20 = sl.head(20); S["adaptive_rule"] = dict(top20_pass_fraction=float(top20.consensus_pass.mean()), judge_median=float(top20[f"{JN}_ipsae"].median()),
+                                                   recommend_cycling=bool(top20.consensus_pass.mean() < 0.9 or top20[f"{JN}_ipsae"].median() < 0.7) and variant == "nocycle")
     return S
 
 def _plots(fd, t, sl, ev, screen, gen, timers, hs, out, variant):
@@ -132,15 +137,15 @@ def _plots(fd, t, sl, ev, screen, gen, timers, hs, out, variant):
     ax.set_xlim(1, max(b for _, b in n) * 6); ax.set_xlabel("designs (log scale)"); ax.set_title(f"Funnel yield: {t['name']}", loc="left"); fig.savefig(P / "01_funnel_yield.png"); plt.close(fig)
     # 2 score scatter
     fig, ax = plt.subplots(figsize=(5.4, 4.9)); sset = set(sl.id)
-    ok = ev.dropna(subset=["b_ipsae", "v2_ipsae"]); a = ok[~ok.id.isin(sset)]; b = ok[ok.id.isin(sset)]
-    ax.scatter(a.b_ipsae, a.v2_ipsae, s=26, c=GREY, alpha=.7, label=f"evaluated, not in shortlist ({len(a)})")
+    ok = ev.dropna(subset=["b_ipsae", f"{JN}_ipsae"]); a = ok[~ok.id.isin(sset)]; b = ok[ok.id.isin(sset)]
+    ax.scatter(a.b_ipsae, a[f"{JN}_ipsae"], s=26, c=GREY, alpha=.7, label=f"evaluated, not in shortlist ({len(a)})")
     for tr, m, c in (("A", "o", GREEN), ("B", "s", BLUE), ("C", "^", VERM)):
         g = b[b.tier == tr]
         if len(g): ax.scatter(g.b_ipsae, g.v2_ipsae, s=62, marker=m, c=c, edgecolor="k", linewidth=.6, label=f"shortlist tier {tr} ({len(g)})")
     ax.axvline(.5, c="#444", lw=.8, ls="--"); ax.axhline(.5, c="#444", lw=.8, ls="--"); ax.set_xlabel("Boltz-2 ipSAE (mean of seeds)"); ax.set_ylabel(f"{o2_label(ev)} ipSAE"); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
     ax.set_title("Two independent predictors (dashed = 0.5 gate)", loc="left"); ax.legend(frameon=False, fontsize=7.5, loc="lower right"); fig.savefig(P / "02_scores_scatter.png"); plt.close(fig)
     # 3 heatmap of the shortlist
-    cols = [("b_ipsae", "Boltz ipSAE", 1), ("v2_ipsae", "v2 ipSAE", 1), ("b_iptm", "Boltz ipTM", 1), ("b_paemin", "interface PAE (A)", -1), ("hotspot_frac", "hotspots contacted", 1), ("pisa_sc", "shape compl.", 1),
+    cols = [("b_ipsae", "Boltz ipSAE", 1), (f"{JN}_ipsae", f"{JN} ipSAE", 1), ("b_iptm", "Boltz ipTM", 1), ("b_paemin", "interface PAE (A)", -1), ("hotspot_frac", "hotspots contacted", 1), ("pisa_sc", "shape compl.", 1),
             ("pisa_interface_area", "interface area (A2)", 1), ("pisa_n_hydrogen_bonds", "H-bonds", 1), ("pisa_n_aromatic_iface", "aromatic contacts", 1), ("pisa_bsa_apolar_frac", "apolar fraction", 1), ("KE", "Lys+Glu", -1)]
     cols = [c for c in cols if c[0] in sl]; M = sl[[c[0] for c in cols]].astype(float).values
     Z = (M - np.nanmean(M, 0)) / (np.nanstd(M, 0) + 1e-9) * np.array([c[2] for c in cols])
@@ -197,13 +202,13 @@ def _report(t, sl, ev, S, variant, hs):
          f"- **Pass rule:** Boltz-2 mean ipSAE >= 0.5 and interface PAE <= 2 A, **and** {o2_label(ev)} ipSAE >= 0.5", ""]
     L += ["## 2. Stage counts and time", "", "| stage | count | seconds |", "|---|---|---|"]
     tm = S["timers_s"]; rows = [("backbones generated", c["backbones"], tm.get("1_generate")), ("MPNN sequences", c["designs_screened"], tm.get("2_mpnn")), ("fast screen (Protenix 0.5-mini)", c["screened_ok"], tm.get("3_fast_screen")),
-                                ("cycling", "" , tm.get("4_cycling")), (f"Boltz-2 ({n_boltz_seeds(ev)} seed{'s' if n_boltz_seeds(ev) != 1 else ''})", c["evaluated_expensive"], tm.get(f"5_boltz_{variant}")), (o2_label(ev), c["evaluated_expensive"], tm.get(f"5_v2_{variant}", tm.get(f"5_af3_{variant}")))]
+                                ("cycling", "" , tm.get("4_cycling")), (f"Boltz-2 ({n_boltz_seeds(ev)} seed{'s' if n_boltz_seeds(ev) != 1 else ''})", c["evaluated_expensive"], tm.get(f"5_boltz_{variant}")), (o2_label(ev), c["evaluated_expensive"], tm.get(f"5_v2_{variant}", tm.get(f"5_af3_{variant}", tm.get(f"5_of3_{variant}"))))]
     L += [f"| {a} | {b if b is not None else ''} | {s if s is not None else ''} |" for a, b, s in rows]
     L += ["", "![funnel](plots/01_funnel_yield.png)", ""]
-    L += ["## 3. Shortlist", "", "| rank | id | tier | Boltz ipSAE | v2 ipSAE | PAE min (A) | hotspots | SC | area (A2) | H-bonds | arom. contacts | flags | sequence |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    L += ["## 3. Shortlist", "", f"| rank | id | tier | Boltz ipSAE | {JN} ipSAE | PAE min (A) | hotspots | SC | area (A2) | H-bonds | arom. contacts | flags | sequence |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in sl.itertuples():
         g = lambda k, f="{:.2f}": (f.format(getattr(r, k)) if hasattr(r, k) and getattr(r, k) == getattr(r, k) else "")
-        L.append(f"| {r.rank} | `{r.id}` | {r.tier} | {g('b_ipsae')} | {g('v2_ipsae')} | {g('b_paemin')} | {g('hotspot_frac')} | {g('pisa_sc')} | {g('pisa_interface_area', '{:.0f}')} | {g('pisa_n_hydrogen_bonds', '{:.0f}')} | {g('pisa_n_aromatic_iface', '{:.0f}')} | {getattr(r, 'pisa_flags', '') if isinstance(getattr(r, 'pisa_flags', ''), str) else ''} | `{r.seq}` |")
+        L.append(f"| {r.rank} | `{r.id}` | {r.tier} | {g('b_ipsae')} | {g(JN + '_ipsae')} | {g('b_paemin')} | {g('hotspot_frac')} | {g('pisa_sc')} | {g('pisa_interface_area', '{:.0f}')} | {g('pisa_n_hydrogen_bonds', '{:.0f}')} | {g('pisa_n_aromatic_iface', '{:.0f}')} | {getattr(r, 'pisa_flags', '') if isinstance(getattr(r, 'pisa_flags', ''), str) else ''} | `{r.seq}` |")
     L += ["", "Tiers: **A** = both models >= 0.7, interface PAE <= 1 A, >= 80% of hotspots contacted, no quality flag. **B** = passes both judges. **C** = other. Tiers rank *model agreement*, not binding.", "",
           "![heatmap](plots/03_design_heatmap.png)", "", "![scatter](plots/02_scores_scatter.png)", ""]
     if len(hs): L += ["![hotspots](plots/04_hotspot_burial.png)", ""]

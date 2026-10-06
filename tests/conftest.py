@@ -76,3 +76,20 @@ def hadq_map():
         chain_filter=["B"],
         sequences={"B": "HADQ"},
     )
+
+
+# A clean CPU environment has none of the heavy stack. A test that needs one of these packages is reported as SKIPPED with the package named,
+# not as a failure: the failure is "not installed", which says nothing about the code. Any other error, and a ModuleNotFoundError for a package
+# not listed here, still fails. In the full `pxd` env these packages are installed and this hook never fires.
+HEAVY_PACKAGES = {"torch", "protenix", "jax", "biotite", "matplotlib", "colabdesign", "deepspeed", "openfold3"}
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    rep = outcome.get_result()
+    exc = call.excinfo.value if call.excinfo is not None else None
+    missing = getattr(exc, "name", None) if isinstance(exc, ModuleNotFoundError) else None
+    if rep.failed and missing and missing.split(".")[0] in HEAVY_PACKAGES:
+        rep.outcome = "skipped"
+        rep.longrepr = (str(item.path), item.location[1] or 0, f"Skipped: needs the full environment ('{missing}' is not installed)")

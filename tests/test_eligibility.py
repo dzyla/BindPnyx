@@ -24,6 +24,7 @@ The four-state truth table is section 4: `not_applicable`, `unevaluable`,
 import numpy as np
 import pandas as pd
 import pytest
+pytest.importorskip("protenix", reason="needs the full pxd environment (protenix)")
 
 from pxdbench.targets.eligibility import (
     PolicyStatus,

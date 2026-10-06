@@ -15,6 +15,7 @@ import json
 
 import numpy as np
 import pytest
+pytest.importorskip("torch", reason="needs the full pxd environment (torch)")
 
 from pxdesign.utils.infer import (
     record_resolved_hotspots,

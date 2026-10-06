@@ -14,7 +14,7 @@ INCLUDE = ["LICENSE", "COMMERCIAL.md", "THIRD_PARTY.md", "README.md", "AGENTS.md
            "funnel", "pxdesign", "pxdbench", "colabdesign", "tests", "phbind", "docs/HOMO_OLIGOMER_TARGETS.md",
            "scripts/setup.sh", "scripts/pxd_env.py", "scripts/run_campaign.sh", "scripts/prepare_target.py", "scripts/preflight_target.py", "scripts/target_spec.py",
            "scripts/check_msa_match.sh", "scripts/setup_extras.sh", "funnel/evaluate_overnight.py", "scripts/fetch_checkpoints.sh", "scripts/boltz_light.py", "scripts/hotspot_e2e_check.py", "scripts/check_public.py", "scripts/export_public.py",
-           "docs/REPORT.md", "docs/RECOMMENDATIONS.md", "docs/WORKFLOW.md", "docs/OVERNIGHT_PLAN.md", "docs/OVERNIGHT_RESULTS.md", "docs/EXTENDING.md", "docs/PROTOCOL.md", "docs/HOTSPOTS.md", "docs/pipeline-flow.md", "docs/make_workflow_figure.py", "docs/figures",
+           "docs/REPORT.md", "docs/RECOMMENDATIONS.md", "docs/WORKFLOW.md", "docs/OVERNIGHT_PLAN.md", "docs/OVERNIGHT_RESULTS.md", "docs/EXTENDING.md", "docs/PROTOCOL.md", "docs/HOTSPOTS.md", "docs/HANDOFF.md", "docs/pipeline-flow.md", "docs/make_workflow_figure.py", "docs/figures",
            "bench/README.md", "bench/run_benchmark.sh", "bench/prepare_labels.py", "bench/make_inputs.py", "bench/make_msas.py", "bench/metrics.py", "bench/score_boltz.py", "bench/score_protenix.py",
            "bench/analyze.py", "bench/remp.py", "bench/check1.py", "bench/cycle.py", "bench/mpnn_round.py", "bench/make_figures.py", "bench/make_followup_figure.py",
            "bench/results/auroc_by_target.csv", "bench/results/sc_sweep.csv", "bench/results/analysis.txt", "bench/results/figures"]

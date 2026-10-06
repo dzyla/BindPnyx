@@ -24,8 +24,15 @@ import numpy as np
 import pandas as pd
 import common
 
-ORACLES = ("protenix-v2", "af3")
+ORACLES = ("protenix-v2", "af3", "of3")
 V2_COLS = ("ok", "ipsae", "ipsae_max", "iptm", "rank", "paemin", "cif")
+
+# ----------------------------------------------------------------------------- OpenFold3 backend
+def of3_fold(df, target, out, seed=101, chunk=1500, tag=""):
+    """OpenFold3 (p2-155k) as the second oracle: the model the 1,320-design release finding was MEASURED with (docs/JUDGE_REGIME.md, tests/test_consensus_regime.py).
+    Delegates to common.of3_fold and returns the columns under the shared `v2_` prefix (see the module docstring), so everything downstream is oracle-agnostic."""
+    r = common.of3_fold(df, target, out, seed=seed, chunk=chunk, tag=tag)
+    r = r.rename(columns={c: "v2_" + c[len("of3_"):] for c in r.columns if c.startswith("of3_")}); r.attrs.update(getattr(r, "attrs", {})); return r
 
 # ----------------------------------------------------------------------------- consensus rule
 def consensus_score(df, cols=("b_ipsae", "v2_ipsae"), rule="min"):

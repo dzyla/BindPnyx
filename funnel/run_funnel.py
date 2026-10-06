@@ -201,6 +201,8 @@ def consensus(t, cands, outdir, seeds, T, tag, gpus=None, oracle2="protenix-v2",
         elif oracle2 == "af3":                     # every GPU pulls designs from one queue; the GPU Boltz-2 is using joins when Boltz-2 is done
             hold = {gpus[0]: boltz_done} if len(gpus) > 1 and gpus[0] is not None else None
             res["v"] = oracles.af3_fold(cands[["id", "seq"]], t, outdir / "af3", seed=seeds[0], gpus=gpus, hold=hold); T.add(f"5_af3_{tag}", time.time() - t0); T.add(f"5_af3_gpu_s_{tag}", res["v"].attrs.get("gpu_seconds", 0.0))
+        elif oracle2 == "of3":
+            common.set_gpu(gpus[-1]); res["v"] = oracles.of3_fold(cands[["id", "seq"]], t, outdir / "of3", seed=seeds[0]); T.add(f"5_of3_{tag}", time.time() - t0)
         else: raise ValueError(f"unknown second oracle {oracle2!r}; choose from {oracles.ORACLES}")
     if len(gpus) > 1:                                                       # Boltz seeds on gpus[:-1], second oracle on the last GPU (AF3: on all), at the same time
         from concurrent.futures import ThreadPoolExecutor
@@ -252,7 +254,8 @@ def shortlist(d, top, thr=0.6):
 def finalize_variant(t, out, tag, src, final_m, top, T, state, force, gpus=None, judge=None):
     judge = judge or dict(seeds=(1, 2, 3), oracle2="protenix-v2", o2_gate=0.5, rank_rule="min")
     c = src.sort_values("fast_ipsae", ascending=False).head(final_m)[["id", "seq"]].copy(); cf = out / f"consensus_{tag}.csv"
-    if cf.exists() and not force and set(pd.read_csv(cf).id) == set(c.id) and (out / f"final_{tag}.csv").exists():
+    old_o2 = (lambda d: d["o2_name"].iloc[0] if "o2_name" in d and len(d) else "protenix-v2")(pd.read_csv(cf)) if cf.exists() else None      # tables written before the option were judged by Protenix-v2
+    if cf.exists() and not force and set(pd.read_csv(cf).id) == set(c.id) and (out / f"final_{tag}.csv").exists() and old_o2 == judge["oracle2"]:   # never reuse another oracle's predictions
         d = pd.read_csv(cf)
         if (d["rank_rule"].iloc[0] if "rank_rule" in d else "min") != judge["rank_rule"]:               # predictions are final; only the ordering changes -> cheap
             d["consensus_min"] = oracles.consensus_score(d, ("b_ipsae", "v2_ipsae"), "min"); d["rank_rule"] = judge["rank_rule"]
@@ -308,6 +311,7 @@ def main():
     ap.add_argument("--rounds", type=int, default=3, help="cycling rounds; raise it later to continue cycling from the saved round"); ap.add_argument("--n-new", type=int, default=8)
     ap.add_argument("--cycle-scope", default="full", help="full | interface[:CUTOFF_A]: which binder residues cycling may change (interface keeps the rest fixed)")
     ap.add_argument("--final-m", type=int, default=60, help="designs given the expensive consensus"); ap.add_argument("--top", type=int, default=20)
+    ap.add_argument("--second-judge", choices=("v2", "of3"), help="DEPRECATED alias of --second-oracle (v2 = protenix-v2, of3 = OpenFold3 p2-155k, needs .pxd/envs/openfold3)")
     ap.add_argument("--no-cycle-ablation", action="store_true", help="skip scoring the pre-cycling shortlist")
     ap.add_argument("--mpnn-weights", default="soluble", choices=["soluble", "original"]); ap.add_argument("--mpnn-bias", default="none", help="none | iface | iface:SCALE  (interface-only hydrophobic/aromatic logit bias, SCALE multiplies it)")
     ap.add_argument("--designs-csv", help="skip generation + MPNN: screen these sequences (columns: seq, [bb], [id])")
@@ -321,6 +325,7 @@ def main():
     a = ap.parse_args(); out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     if a.status: return print_status(out)
     if not a.target: ap.error("--target is required")
+    if a.second_judge and not a.second_oracle: a.second_oracle = {"v2": "protenix-v2", "of3": "of3"}[a.second_judge]
     jd = JUDGES[a.judge]; second = a.second_oracle or jd["second_oracle"]; bseeds = a.boltz_seeds or jd["boltz_seeds"]
     if a.fork_from: fork_run(a.fork_from, out, dict(judge=a.judge, second_oracle=second, boltz_seeds=bseeds))
     judge = dict(seeds=tuple(int(x) for x in bseeds.split(",")), oracle2=second, o2_gate=a.o2_gate, rank_rule=a.rank_rule or jd["rank_rule"])

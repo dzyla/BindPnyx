@@ -8,6 +8,7 @@ through a broken symlink and raised FileNotFoundError on the absent target.
 Found by actually running the pipeline, not by the unit tests.
 """
 import pytest
+pytest.importorskip("torch", reason="needs the full pxd environment (torch)")
 
 from pxdesign.utils.infer import download_inference_cache
 from pxdesign.utils.pipeline import check_tool_weights

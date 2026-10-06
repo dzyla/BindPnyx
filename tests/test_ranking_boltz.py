@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+pytest.importorskip("protenix", reason="needs the full pxd environment (protenix)")
 
 from pxdesign.runner.helpers import infer_mode_from_df, pre_filter_boltz
 

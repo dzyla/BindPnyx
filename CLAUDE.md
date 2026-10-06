@@ -50,7 +50,7 @@ harmless, falls back to torch layer_norm, numerically identical). A stale
 ./scripts/run_campaign.sh -i manifests/x.json -o out/run1 --backbones 100 --seqs 4
 python3 scripts/preflight_target.py manifests/x.json
 python scripts/prepare_target.py --help          # shard from a PDB, with provenance
-PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q   # 674 pass, 6 skipped (opt-in real Boltz)
+PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q   # 691 pass, 21 skipped (no GPU / private data / opt-in real Boltz); bare env: heavy-dep tests skip
 ```
 
 Use `python -u` when redirecting. Capture `$?` on the line after the command, not after `echo`.

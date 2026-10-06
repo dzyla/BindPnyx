@@ -1,4 +1,5 @@
 import pytest
+pytest.importorskip("protenix", reason="needs the full pxd environment (protenix)")
 
 from pxdbench.pxd_configs.eval import eval_configs
 from pxdesign.runner.pipeline import detect_use_boltz_filter, detect_use_ptx_filter

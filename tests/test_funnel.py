@@ -259,3 +259,13 @@ def test_conservation_requires_an_msa_that_fits_the_query(tmp_path):
     f = tmp_path / "m.csv"; f.write_text("key,sequence\n0,ACDE\n1,ACDF\n2,ACDE\n3,AC-E\n4,ACDE\n5,ACDE\n")
     assert list(hs.conservation(f, "ACDE")) == pytest.approx([1.0, 1.0, 5 / 6, 5 / 6])
     assert hs.conservation(f, "ACD") is None                                                                     # length mismatch -> no silent misalignment
+
+
+def test_ipsae_directional_separates_the_two_directions_and_agrees_with_min_max():
+    nt, nb = 40, 30
+    pae = np.full((nt + nb, nt + nb), 0.5); pae[:nt, nt:] = 30.0       # target->binder uncertain, binder->target confident
+    b2t, t2b = common.ipsae_directional(pae, nt, nb)
+    assert b2t > 0.8 and t2b == 0.0
+    assert (min(b2t, t2b), max(b2t, t2b)) == common.ipsae(pae, nt, nb)
+    pae2 = np.full_like(pae, 0.5); pae2[nt:, :nt] = 30.0               # and the other way round
+    assert common.ipsae_directional(pae2, nt, nb)[0] == 0.0

@@ -2,6 +2,7 @@ import json
 import os
 
 import pytest
+pytest.importorskip("torch", reason="needs the full pxd environment (torch)")
 
 from pxdesign.runner.pipeline import accumulate_successes, early_stop_success_key
 

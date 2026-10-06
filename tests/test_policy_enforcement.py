@@ -15,6 +15,7 @@ The acceptance criteria these tests encode:
 import numpy as np
 import pandas as pd
 import pytest
+pytest.importorskip("protenix", reason="needs the full pxd environment (protenix)")
 
 from pxdbench.targets.eligibility import (
     POLICY_V1,

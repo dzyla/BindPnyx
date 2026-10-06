@@ -11,7 +11,8 @@ S1 s1_generate.py   PXDesign backbones on a DIMER shard (cheaper; epitope-neutra
    s1_queue.py      resumable (hotspot set x length) queue -> SolubleMPNN -> out/phbind/designs_all.csv
 S2 s2_prescreen.py  1-seed Boltz-2 on the INTACT trimer, stratified batches with reference carriers (resumable)
    peek.py          score what has finished NOW (even inside the running batch) -> out/phbind/candidates_screen.csv
-S3 boltz_trimer.py  N seeds, one batch per seed, grouped ipSAE, gate (`summarise`);  of3_trimer.py = second oracle (OpenFold3)
+S3 boltz_trimer.py  N seeds, one batch per seed, grouped ipSAE, per-design gate (`summarise`);  of3_trimer.py = second oracle (OpenFold3)
+   s3_gate.py       Boltz-2 x5 + OpenFold3 x1: PASS on min (unanimous), ORDER by the mean of the two oracles (funnel/oracles.py)
 S4 s4_variants.py   histidine placements (M3 pair, M1 single) from a refolded structure + a post-refold AP1 census
 S8 s8_assemble.py   dedupe, lineage cap, row order, format contract (raises on any violation)
    convention_check.py  which ipSAE direction your gate was calibrated on (see below)
@@ -26,6 +27,9 @@ S8 s8_assemble.py   dedupe, lineage cap, row order, format contract (raises on a
 - **The gate is calibrated on the MIN direction.** A published gate (seed-unanimous, mean >= 0.65, worst >= 0.5) said "use max", but its reference table is
   reproduced by min (Spearman 0.93, same pass count) and not by max (bias +0.20; 14/20 vs 5/20 pass). `phbind/convention_check.py` prints that evidence for
   your own reference set. Thresholds are only valid in the convention they were fitted in. Report both; gate on the calibrated one.
+- **Gate on min, order by mean.** Independent finding in this repo's single-chain benchmark (`docs/JUDGE_REGIME.md`): with the same two models, `min` is right for pass/fail and
+  poor for ranking, `mean` ranks better; the pair is fixed, not chosen per target. `phbind/s3_gate.py` applies exactly that on the trimer, reusing `funnel/oracles.consensus_score`.
+  The same document finds the ipSAE direction hardly matters for *ranking* at that sample size and keeps gates on `ipsae_min`: consistent with the calibration check above.
 - **Gate on counted artifacts, not exit codes.** Boltz-2 exits 0 and writes nothing when one input fails to parse (a single stray NUL byte at the end of an
   a3m did exactly that). `run_seed` raises if any design lacks its confidence+PAE files. `s0_target.py` asserts no NUL in any registered MSA.
 - **A residue conflict between structure and construct is declared, not ignored.** `prepare_target.py` refuses it; reconcile with

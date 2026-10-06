@@ -43,7 +43,7 @@ screen with stratified batches that carry reference designs, and gate on counted
 - Protenix model names: use **`protenix-v2`** (v2) and **`protenix_mini_default_v0.5.0`** (fast). The files named `…base_default_v0.5.0.pt` are v2 or v1.0.0 under a wrong name; check sha1.
 - Harmless noise: a failed fused-LayerNorm compile (`List_inl.h … typename`) on every Protenix import (~80 s), and `ld: cannot find -laio` in pytest. A stale
   `protenix/model/layer_norm/lock` hangs the import only if no `nvcc` is running: delete it then.
-- Tests (CPU): `PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q -p no:cacheprovider` (674 pass, 6 skipped opt-in). Run before and after any code change.
+- Tests (CPU): `PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q -p no:cacheprovider` (691 pass, 21 skipped). Run before and after any code change.
 - Verify CUDA with a real matmul, not `torch.cuda.is_available()`.
 
 ## Playbook: design binders for a new target

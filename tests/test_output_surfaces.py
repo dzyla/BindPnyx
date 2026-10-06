@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 import pytest
+pytest.importorskip("protenix", reason="needs the full pxd environment (protenix)")
 
 from pxdesign.runner.helpers import process_boltz_results, save_difficulty_fig
 from pxdesign.utils.pipeline import trim_summary_df

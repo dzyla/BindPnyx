@@ -19,6 +19,8 @@ def _env_bin(var, rel):
 PXD_PY = lambda: _env_bin("PXD_PYTHON", "pxd/bin/python")
 PXD_BIN = lambda name: str(Path(PXD_PY()).parent / name)
 BOLTZ = lambda: _env_bin("PXD_BOLTZ_BIN", "boltz/bin/boltz")
+OF3 = lambda: _env_bin("PXD_OF3_BIN", "openfold3/bin/run_openfold")
+OF3_CKPT = lambda: os.environ.get("PXD_OF3_CKPT", str(Path.home() / ".openfold3" / "of3-p2-155k.pt"))   # the checkpoint the benchmark's `of3` oracle used; another one invalidates the measured gain
 CKPT = lambda: os.environ.get("PXD_CHECKPOINTS", str(REPO / "checkpoints"))
 
 # ----------------------------------------------------------------------------- GPUs (multi-GPU workstations)
@@ -121,6 +123,14 @@ def ipsae(pae, n_target, n_binder):
     pae = np.asarray(pae, float); t = np.arange(n_target); b = np.arange(n_target, n_target + n_binder)
     x, y = _ipsae_dir(pae, b, t), _ipsae_dir(pae, t, b); return min(x, y), max(x, y)
 
+def ipsae_directional(pae, n_target, n_binder):
+    """(binder->target, target->binder) ipSAE: PAE rows are the aligned residues (binder rows scored on target columns for the first). Report-only:
+    on the 1,320-design release the binder->target direction ranked slightly better within target (AUROC 0.718 vs 0.701 for the min), which is not
+    enough to move the funnel's gate, calibrated on the min. Whether the release's `ipsae_binder_to_target` uses this exact row/column convention
+    is unverified here (the PAE files are not on this machine)."""
+    pae = np.asarray(pae, float); t = np.arange(n_target); b = np.arange(n_target, n_target + n_binder)
+    return _ipsae_dir(pae, b, t), _ipsae_dir(pae, t, b)
+
 def pae_interface_min(pae, nt):
     return float(min(pae[nt:, :nt].min(), pae[:nt, nt:].min()))
 
@@ -179,13 +189,13 @@ def boltz_fold(df, target, out, seeds=(1,), recycles=3, steps=200, keep_structur
             row = rows.setdefault(r.id, dict(id=r.id))
             if not (cj.exists() and pn.exists()): row.setdefault("n_fail", 0); row["n_fail"] += 1; continue
             c = json.load(open(cj)); pae = np.load(pn)["pae"]; lo, hi = ipsae(pae, nt, len(r.seq))
-            row.setdefault("ipsae_s", []).append(lo); row.setdefault("paemin_s", []).append(pae_interface_min(pae, nt)); row.setdefault("iptm_s", []).append(c["iptm"])
+            row.setdefault("ipsae_s", []).append(lo); row.setdefault("b2t_s", []).append(ipsae_directional(pae, nt, len(r.seq))[0]); row.setdefault("paemin_s", []).append(pae_interface_min(pae, nt)); row.setdefault("iptm_s", []).append(c["iptm"])
             if keep_structures and "cif" not in row:
                 cifs = list(d.glob("*.cif")); row["cif"] = str(cifs[0]) if cifs else None
     res = []
     for i, row in rows.items():
         if "ipsae_s" not in row: res.append(dict(id=i, b_ok=False)); continue
-        res.append(dict(id=i, b_ok=True, b_ipsae=float(np.mean(row["ipsae_s"])), b_ipsae_sd=float(np.std(row["ipsae_s"])), b_paemin=float(np.mean(row["paemin_s"])),
+        res.append(dict(id=i, b_ok=True, b_ipsae=float(np.mean(row["ipsae_s"])), b_ipsae_sd=float(np.std(row["ipsae_s"])), b_ipsae_b2t=float(np.mean(row["b2t_s"])), b_paemin=float(np.mean(row["paemin_s"])),
                         b_iptm=float(np.mean(row["iptm_s"])), b_nseeds=len(row["ipsae_s"]), b_cif=row.get("cif")))
     d = pd.DataFrame(res); d.attrs["seconds"] = time.time() - t0; return d
 
@@ -218,7 +228,7 @@ def protenix_fold(df, target, out, arm="fast", seed=101, chunk=1500, tag=""):
         sj, fj, cf = paths(r.id)
         if not all(p.exists() for p in (sj, fj, cf)): rows.append(dict(id=r.id, ok=False)); continue
         s = json.load(open(sj)); pae = np.array(json.load(open(fj))["token_pair_pae"]); lo, hi = ipsae(pae, nt, len(r.seq))
-        rows.append(dict(id=r.id, ok=True, ipsae=lo, ipsae_max=hi, iptm=s["iptm"], rank=s["ranking_score"], paemin=pae_interface_min(pae, nt), cif=str(cf)))
+        rows.append(dict(id=r.id, ok=True, ipsae=lo, ipsae_max=hi, ipsae_b2t=ipsae_directional(pae, nt, len(r.seq))[0], iptm=s["iptm"], rank=s["ranking_score"], paemin=pae_interface_min(pae, nt), cif=str(cf)))
     d = pd.DataFrame(rows).add_prefix(f"{arm}_").rename(columns={f"{arm}_id": "id"}); d.attrs["seconds"] = time.time() - t0; return d
 
 
@@ -229,3 +239,53 @@ def protenix_fold_multi(df, target, out, arm="fast", seed=101, gpus=None):
     shards = [df.iloc[i::len(gpus)] for i in range(len(gpus))]
     parts = parallel_map(lambda k: protenix_fold(shards[k], target, out, arm, seed, tag=f"g{k}_"), range(len(gpus)), gpus)
     d = pd.concat(parts, ignore_index=True); d.attrs["seconds"] = max(p.attrs.get("seconds", 0) for p in parts); return d
+
+
+# ----------------------------------------------------------------------------- OpenFold3 (second judge)
+def a3m_rectangular(src, dst):
+    """Write `src` to `dst` as a rectangular a3m (every row has the query's number of match columns). Returns the number of rows.
+    Our target MSAs drop trailing gaps, which OpenFold3's parser rejects; padding on the right is exact. Raises if a row is longer than the query or the file is empty."""
+    rows, h = [], None
+    for l in open(src):
+        l = l.rstrip("\n")
+        if l[:1] == ">": h = l
+        elif h is not None: rows.append((h, l)); h = None
+    if not rows: raise ValueError(f"empty MSA: {src}")
+    w = len(re.sub("[a-z]", "", rows[0][1])); out = []
+    for h, l in rows:
+        n = len(re.sub("[a-z]", "", l))
+        if n > w or not l: raise ValueError(f"malformed MSA row in {src}: {h!r} has {n} match columns, query has {w}")
+        out += [h, l + "-" * (w - n)]
+    Path(dst).write_text("\n".join(out) + "\n"); return len(rows)
+
+def of3_fold(df, target, out, seed=101, chunk=1500, tag=""):
+    """OpenFold3 (p2-155k) on target + binder, template-free, target with its unpaired MSA, binder a query-only MSA: the benchmark's `of3` setup.
+    df: columns id, seq. Same return layout as protenix_fold with the prefix `of3_` (ipsae, ipsae_max, iptm, rank, paemin, cif). RESUMABLE per design.
+    The model is loaded once per chunk, so a chunk should be large."""
+    out = Path(out); (out / "msa").mkdir(parents=True, exist_ok=True); nt = len(target["seq"]); tmsa = out / "msa" / "target" / "colabfold_main.a3m"; tmsa.parent.mkdir(exist_ok=True)
+    depth = a3m_rectangular(target["msa"], tmsa)
+    if depth < 2: raise ValueError(f"target MSA has {depth} row(s): refusing to fold without a real MSA ({target['msa']})")
+    base = lambda i: out / "pred" / i / f"seed_{seed}"
+    files = lambda i: (base(i) / f"{i}_seed_{seed}_sample_1_confidences.json", base(i) / f"{i}_seed_{seed}_sample_1_confidences_aggregated.json", base(i) / f"{i}_seed_{seed}_sample_1_model.cif")
+    todo = df[[not all(p.exists() for p in files(r.id)) for r in df.itertuples()]]; t0 = time.time()
+    (out / "runner.yml").write_text(f"experiment_settings:\n  seeds:\n    - {seed}\n")
+    for c0 in range(0, len(todo), chunk):
+        qs = {}
+        for r in todo.iloc[c0:c0 + chunk].itertuples():
+            bm = out / "msa" / r.id / "colabfold_main.a3m"; bm.parent.mkdir(exist_ok=True); bm.write_text(f">query\n{r.seq}\n")
+            qs[r.id] = {"chains": [{"molecule_type": "protein", "chain_ids": ["A"], "sequence": target["seq"], "main_msa_file_paths": str(tmsa.resolve())},
+                                   {"molecule_type": "protein", "chain_ids": ["B"], "sequence": r.seq, "main_msa_file_paths": str(bm.resolve())}]}
+        qf = out / f"query_{tag}{c0}.json"; json.dump({"queries": qs}, open(qf, "w"))
+        p = subprocess.run([OF3(), "predict", "--query-json", str(qf), "--use-msa-server=False", "--output-dir", str(out / "pred"), "--num-diffusion-samples", "1",
+                            "--runner-yaml", str(out / "runner.yml"), "--inference-ckpt-path", OF3_CKPT()], capture_output=True, text=True, env={**gpu_env()})
+        (out / f"log_{tag}{c0}.txt").write_text(p.stdout[-20000:] + p.stderr[-20000:])
+        if p.returncode: raise RuntimeError("openfold3 failed:\n" + p.stderr[-1500:])   # per-design failures do not raise: they show as ok=False below
+    rows = []
+    for r in df.itertuples():
+        cj, aj, cf = files(r.id)
+        if not all(x.exists() for x in (cj, aj, cf)): rows.append(dict(id=r.id, ok=False)); continue
+        a = json.load(open(aj)); pae = np.array(json.load(open(cj))["pae"], float)
+        if pae.shape != (nt + len(r.seq),) * 2: rows.append(dict(id=r.id, ok=False)); continue
+        lo, hi = ipsae(pae, nt, len(r.seq))
+        rows.append(dict(id=r.id, ok=True, ipsae=lo, ipsae_max=hi, ipsae_b2t=ipsae_directional(pae, nt, len(r.seq))[0], iptm=a["iptm"], rank=a["sample_ranking_score"], paemin=pae_interface_min(pae, nt), cif=str(cf)))
+    d = pd.DataFrame(rows).add_prefix("of3_").rename(columns={"of3_id": "id"}); d.attrs["seconds"] = time.time() - t0; return d

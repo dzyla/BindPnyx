@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+pytest.importorskip("biotite", reason="needs the full pxd environment (biotite)")
 
 from pxdbench.tasks.base import BaseTask
 

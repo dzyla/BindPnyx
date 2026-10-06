@@ -31,7 +31,7 @@ Top-20 designs per strategy, judged identically with fresh seeds (Boltz-2 x3 + P
 
 - The biggest single factor was **conditioning on the right residues** (the stock pipeline reads hotspots on a prebuilt shard in shard numbering; wrong indices ran silently).
 - Cycling helps on harder targets (FimA) and is optional elsewhere; an adaptive rule is in the review report.
-- **What a pass means:** two structure predictors agree. On 206 wet-lab-labelled designs they separated binders from non-binders only moderately (AUROC 0.67-0.75; both >= 0.7 gave a 75% binder rate on that balanced set). Treat the output as a candidate list, order a diverse panel, and calibrate with lab results.
+- **What a pass means:** two structure predictors agree. On 206 wet-lab-labelled designs (4 targets) they separated binders from non-binders only moderately: pooled AUROC 0.67-0.75, but that pools across targets and so partly credits target difficulty. Within a target and method it ranges 0.36-0.93 (`bench/results/analysis.txt`: Boltz ipSAE-min 0.36 on IL-7R/RFdiffusion, 0.42 on PD-L1/BoltzGen, 0.93 on MDM2/EvoDiff), and on the 1,320-design release it is about 0.70 within target. Most of a campaign's hit rate is decided by which target was chosen. Treat the output as a candidate list, order a diverse panel, and calibrate with lab results.
 - Details: [docs/REPORT.md](docs/REPORT.md) (benchmark, diagnosis, follow-up checks), [docs/RECOMMENDATIONS.md](docs/RECOMMENDATIONS.md) (how to run it well).
 
 ### Hard test: FimH mannose pocket (E. coli adhesin, PDB 3MCY; not tuned on)
@@ -114,7 +114,7 @@ colabdesign/  vendored ColabDesign build whose ProteinMPNN accepts `weights=`
 scripts/      environment setup (+ extras), target preparation, the original campaign runner, export_public.py / check_public.py (clean release tree + scanner)
 bench/        ProteinBase benchmark + generation experiments (scores, AUROC tables, figures)
 docs/         REPORT, RECOMMENDATIONS, WORKFLOW, EXTENDING, OVERNIGHT_PLAN, pipeline-flow
-tests/        674 + tests, CPU only:   PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q
+tests/        CPU only, no GPU needed:   PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q   (682 pass, 21 skipped in the full env; in a bare pandas/numpy/scipy env the tests that need torch, protenix, jax, biotite or matplotlib are skipped, not errors)
 .archive/     (git-ignored) earlier experiments and documents; nothing was deleted
 ```
 

@@ -22,7 +22,7 @@ $EDITOR funnel/targets/mytarget.json                      # target definition (b
 ```
 
 Resumable (each stage's outputs are reused; `--force` redoes). One GPU job at a time. Typical cost on one RTX 5090 for a 70–85-residue binder:
-**~1.1 GPU-hours** (500 backbones). Outputs in `--out`: `final_cycled.csv` (the shortlist: sequence, Boltz-2/Protenix-v2 scores, hotspot contact,
+**~1.1 GPU-hours** (500 backbones). `--second-judge of3` swaps Protenix-v2 for OpenFold3 p2-155k as the second judge (see docs/RECOMMENDATIONS.md §19); the default stays `v2`. Outputs in `--out`: `final_cycled.csv` (the shortlist: sequence, Boltz-2/Protenix-v2 scores, hotspot contact,
 `consensus_pass`), `consensus_cycled/boltz/seed1/**/*.cif` (predicted complexes), `timers.json`, and every intermediate table.
 
 ### Target definition (`funnel/targets/*.json`)

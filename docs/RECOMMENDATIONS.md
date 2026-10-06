@@ -219,3 +219,27 @@ Consequences: (1) judging a docked pose with a co-folding model measures *recogn
 sanitizes machine paths, runs `scripts/check_public.py` (personal paths/handles, emails, credentials, data files, large files, symlinks) and the test suite inside the clean tree
 (616 passed, 64 skipped, 0 failed at the time of writing). It does `git init` but no commit and no remote. Targets are rebuilt from public PDB ids by `funnel/fetch_target.py`.
 Items for the owner to decide before publishing: the licence (AGPL-3.0, `COMMERCIAL.md`), the project name, and whether the benchmark figures in `docs/` may be shown.
+
+## 19. Second judge: OpenFold3 instead of Protenix-v2 (implemented 2026-10-05; measured elsewhere, not wet-lab validated by us)
+
+`run_funnel.py --second-judge of3` folds the survivors with OpenFold3 (checkpoint **p2-155k**, template-free, target MSA, binder as a query-only MSA: the benchmark's `of3` setup) in place of Protenix-v2. The gate is unchanged (`consensus = min(b_ipsae, <judge>_ipsae)`; Boltz-2 3 seeds, OpenFold3 1 seed). The default is still `v2`.
+
+Why: on the `Anthropic/claude-protein-binder-design` v1.0 release (1,320 designs, 354 binders, 15 targets), holding the funnel's rule fixed and changing only the second oracle, precision@10 (paired bootstrap over targets) was:
+
+| second judge | vs Protenix-v2 | 95% CI |
+|---|---|---|
+| OpenFold3 | +0.093 | [+0.020, +0.173] |
+| RoseTTAFold3 | +0.053 | [-0.013, +0.120] |
+| ESMFold2 (full) | +0.040 | [-0.033, +0.107] |
+
+Only OpenFold3 clears zero; the funnel's current pair scored 0.467 (worst of the pairs tried) and Boltz-2 + OpenFold3 0.560. **These numbers come from an external analysis. They could not be re-derived here: the release's wet-lab labels are not on this machine** (the score/PAE bundle is). Treat them as a prior, and recheck on your own lab results.
+
+Rules that came with it:
+- **Two oracles, not three:** 2 vs Boltz-2 alone +0.100 [+0.027, +0.187]; a third +0.000 [-0.020, +0.020].
+- **Freeze the pair.** Choosing the oracle combination per target scored 0.480 vs 0.553 for a fixed pair (-0.073 [-0.153, -0.007]).
+- **Do not fit a scorer** on seed instability, length, cycling rounds or provenance: every added feature lowered held-out precision@10 (plain consensus 0.587, everything 0.467).
+- **Seeds:** aggregation (mean/median/min/max) is worth 0.003; the second oracle +0.100. The funnel still spends 3 Boltz-2 seeds; moving to 1 Boltz-2 + 1 OpenFold3 at equal cost is *not* implemented, because the gate's `b_ipsae >= 0.5 & b_paemin <= 2` was calibrated on 3 seeds.
+- **Directional ipSAE:** `*_ipsae_b2t` (binder->target) is reported for Boltz-2, Protenix and OpenFold3. Across oracles it ranked slightly better within target than the min (AUROC 0.718 vs 0.701), but the gate is calibrated on the min, so it is report-only.
+
+Setup: `.pxd/envs/openfold3` is a symlink to a conda env (python 3.12, torch cu128, `pip install -e <openfold-3 clone>[cuequivariance]`); weights in `~/.openfold3/of3-p2-155k.pt` (override with `PXD_OF3_CKPT`, binary with `PXD_OF3_BIN`). Run one GPU job at a time. OpenFold3 needs rectangular a3m files named like a database (`colabfold_main.a3m`); our target MSAs have ragged rows, which `common.a3m_rectangular` pads (a target MSA with fewer than 2 rows is refused). Measured speed: 6 designs in 52 s including model load.
+

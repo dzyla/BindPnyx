@@ -130,3 +130,13 @@ def test_his_variants_differ_only_at_declared_positions_and_never_add_cys():
     for name, (s, pos) in v.items():
         assert {i + 1 for i, (a, b) in enumerate(zip(seq, s)) if a != b} <= set(pos) and all(s[p - 1] == "H" for p in pos)
     assert max(len(p) for _, p in v.values()) <= 3         # one-shot His count is capped: three broke 4/6 scaffolds in a measured campaign
+
+
+def test_gate_passes_on_min_and_orders_by_mean_and_never_scores_with_one_oracle():
+    import s3_gate
+    s = pd.DataFrame(dict(id=["a", "b", "c", "d"], gate_pass=[True, True, True, False], ipsae_mean=[0.70, 0.90, 0.80, 0.95]))
+    o = pd.DataFrame(dict(id=["a", "b", "c"], of3_ipsae_min=[0.80, 0.30, 0.78], of3_ipsae_max=[0.9] * 3))   # d has no OpenFold3 result
+    t = s3_gate.combine(s, o).set_index("id")
+    assert list(t.index[:2]) == ["c", "a"]                                    # passers first, ordered by mean (0.79 > 0.75)
+    assert not t.loc["b", "consensus_pass"] and t.loc["b", "consensus"] == pytest.approx(0.60)    # b: high Boltz, OpenFold3 fails the gate
+    assert pd.isna(t.loc["d", "consensus"]) and not t.loc["d", "consensus_pass"]                  # missing oracle -> NaN, not Boltz alone

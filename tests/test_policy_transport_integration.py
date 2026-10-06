@@ -15,6 +15,7 @@ existing testing seam (CLAUDE.md section 7, open question 4).
 """
 import pandas as pd
 import pytest
+pytest.importorskip("protenix", reason="needs the full pxd environment (protenix)")
 
 from pxdbench.targets.eligibility import PolicyStatus, SelectionContext
 from pxdbench.tools.boltz.backend import BoltzBackend

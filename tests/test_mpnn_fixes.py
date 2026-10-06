@@ -6,6 +6,7 @@ the handoff, which the code disproves.
 import os
 
 import pytest
+pytest.importorskip("jax", reason="needs the full pxd environment (jax)")
 
 from pxdbench.globals import MPNN_CKPT_PATH
 from pxdbench.tools.biopython_utils import get_interface_residue_id, hotspot_residues
