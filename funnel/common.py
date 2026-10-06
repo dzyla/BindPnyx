@@ -85,6 +85,15 @@ def _kabsch(P, Q):
     pc, qc = P.mean(0), Q.mean(0); U, S, Vt = np.linalg.svd((Q - qc).T @ (P - pc)); d = np.sign(np.linalg.det(Vt.T @ U.T)); R = Vt.T @ np.diag([1, 1, d]) @ U.T
     return R, pc - R @ qc
 
+def _two_chains(ch, what):
+    """funnel/common assumes target = first chain, binder = second. On a homo-oligomer target (3+ chains) that silently measures target-vs-target
+    (the binder is read as a target chain). Refuse; the trimer-aware path is phbind/ (group_indices, epitope_metrics)."""
+    ids = sorted(ch)
+    if len(ids) != 2:
+        raise ValueError(f"{what}: expected exactly 2 chains (target, binder), found {len(ids)} {ids}. Multi-chain targets must use phbind/ "
+                         "(sequence-based grouping); this function would score target against target.")
+    return ids
+
 def site_occlusion(cif, t):
     """Where a bound ligand sat in the reference structure, does the predicted binder sit? Aligns the predicted target onto the reference by CA, maps the ligand
     'probe' atoms (the part deepest in the pocket) into the prediction and measures binder heavy atoms near them.
@@ -92,7 +101,7 @@ def site_occlusion(cif, t):
     from Bio.PDB import MMCIFParser
     if not t.get("site_dir"): return {}
     d = Path(t["site_dir"]); ref_ca = np.load(d / "ref_ca.npy"); probe = np.load(d / "probe.npy")
-    ch = {c.id: c for c in MMCIFParser(QUIET=True).get_structure("x", str(cif))[0]}; ids = sorted(ch)
+    ch = {c.id: c for c in MMCIFParser(QUIET=True).get_structure("x", str(cif))[0]}; ids = _two_chains(ch, "site_occlusion")
     ca = np.array([r["CA"].coord for r in ch[ids[0]] if "CA" in r]); b = np.array([a.coord for r in ch[ids[1]] for a in r if a.element != "H"])
     if len(ca) != len(ref_ca): return {}
     R, tr = _kabsch(ca, ref_ca); pr = probe @ R.T + tr
@@ -119,7 +128,7 @@ def hotspot_contacts(cif, nt, hotspot_idx, cutoff=5.0):
     """Fraction of hotspot residues with a binder heavy atom within `cutoff` A; also the number contacted."""
     from Bio.PDB import MMCIFParser
     ch = {c.id: c for c in MMCIFParser(QUIET=True).get_structure("x", str(cif))[0]}
-    ids = sorted(ch)
+    ids = _two_chains(ch, "hotspot_contacts")
     tgt, bnd = ch[ids[0]], ch[ids[1]]
     batoms = np.array([a.coord for r in bnd for a in r if a.element != "H"])
     tres = [r for r in tgt]

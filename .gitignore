@@ -13,3 +13,6 @@ out/
 *.cif
 *.pdb
 !tests/fixtures/*
+
+# homo-oligomer campaign data (generated targets, run outputs) is never committed
+phbind/target/

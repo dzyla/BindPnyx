@@ -1,0 +1,3 @@
+# generated target data (organiser structures, MSAs, manifest) and run data are never committed
+target/
+__pycache__/

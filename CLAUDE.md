@@ -21,6 +21,7 @@ The previous, much longer version of this file is in `.archive/docs/CLAUDE.full.
 - **The gate is provisional.** `bz_gate_egfr_provisional_v1` (ipSAE ≥ 0.5, PAE_min ≤ 2, 3 seeds)
   is hard-wired to EGFR and, against ProteinBase labels, passes 78% of binders *and* 51% of
   confirmed non-binders. A gate pass is a candidate, not a binder.
+- **Multi-chain targets use `phbind/`, not `funnel/`** (`docs/HOMO_OLIGOMER_TARGETS.md`): funnel/common reads the binder as a target chain and raises on >2 chains. Gate ipSAE on the direction the gate was calibrated on (min), and on counted output files.
 - **Verify CUDA with a real matmul**, never `torch.cuda.is_available()` (RTX 5090 = sm_120).
 - **Never `pkill -f` / `pgrep -f` a pattern that appears in your own command line**; take PIDs
   from `ps` and use `kill -0 PID` to wait.

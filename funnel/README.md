@@ -37,6 +37,8 @@ Resumable (each stage's outputs are reused; `--force` redoes). One GPU job at a 
 
 The identity check exists because the pipeline reads `hotspot` numbers on a `.pkl.gz` shard as the shard's own numbering (restarting at 1).
 
+**Not for multi-chain targets.** A homo-oligomer target (binding site between protomers) needs the trimer-aware path in `phbind/` (`docs/HOMO_OLIGOMER_TARGETS.md`); `common.hotspot_contacts`/`site_occlusion` now raise on more than two chains.
+
 ## Judge any shortlist identically
 
 ```bash

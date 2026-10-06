@@ -31,6 +31,12 @@ Read `docs/RECOMMENDATIONS.md` for the why. This file is the playbook and the gu
 - Before publishing anything: `python scripts/export_public.py --dest <new dir> --run-tests` builds a clean tree and runs the scanner; it must report 0 findings. Never push this working tree or its git history.
 - Another route can be added as a CSV of sequences (`--designs-csv`); see docs/EXTENDING.md. Report a new route only with the judge and controls (`funnel/judge.py`, `funnel/controls.py`).
 
+## Multi-chain (homo-oligomer) targets
+
+`funnel/` is single-chain; `funnel/common.py` raises on complexes with more than two chains. Use `phbind/` (guide: `docs/HOMO_OLIGOMER_TARGETS.md`): generate on a dimer shard,
+score on the intact oligomer, group all target copies as one in ipSAE, **gate on the MIN direction unless your own reference set says otherwise** (`phbind/convention_check.py`),
+screen with stratified batches that carry reference designs, and gate on counted output files (Boltz-2 exits 0 on a skipped input). Never use plain ProteinMPNN weights.
+
 ## Environment facts
 
 - Interpreters: `.pxd/envs/pxd/bin/python` (diffusion, MPNN, Protenix, funnel), `.pxd/envs/boltz/bin/boltz` (Boltz-2, subprocess). Always `export PYTHONPATH=<repo>`.

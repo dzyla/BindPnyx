@@ -11,7 +11,7 @@ HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE / "scripts")); import check_public
 
 INCLUDE = ["LICENSE", "COMMERCIAL.md", "THIRD_PARTY.md", "README.md", "AGENTS.md", "CLAUDE.md", "pyproject.toml", "setup.py", "requirements.txt", "pytest.ini",
-           "funnel", "pxdesign", "pxdbench", "colabdesign", "tests",
+           "funnel", "pxdesign", "pxdbench", "colabdesign", "tests", "phbind", "docs/HOMO_OLIGOMER_TARGETS.md",
            "scripts/setup.sh", "scripts/pxd_env.py", "scripts/run_campaign.sh", "scripts/prepare_target.py", "scripts/preflight_target.py", "scripts/target_spec.py",
            "scripts/check_msa_match.sh", "scripts/setup_extras.sh", "funnel/evaluate_overnight.py", "scripts/fetch_checkpoints.sh", "scripts/boltz_light.py", "scripts/hotspot_e2e_check.py", "scripts/check_public.py", "scripts/export_public.py",
            "docs/REPORT.md", "docs/RECOMMENDATIONS.md", "docs/WORKFLOW.md", "docs/OVERNIGHT_PLAN.md", "docs/OVERNIGHT_RESULTS.md", "docs/EXTENDING.md", "docs/PROTOCOL.md", "docs/HOTSPOTS.md", "docs/pipeline-flow.md", "docs/make_workflow_figure.py", "docs/figures",
@@ -40,6 +40,7 @@ def main():
         s = HERE / item
         if s.exists(): copy_tree(s, dest / item)
         else: print("skip (absent):", item)
+    shutil.rmtree(dest / "phbind" / "target", ignore_errors=True)       # generated target data (structures, MSAs): never exported
     for p in dest.rglob("*"):                              # sanitize obviously private absolute paths in text files
         if p.is_file() and p.suffix in (".py", ".md", ".sh", ".json", ".txt", ".toml", ".cfg", ".yaml", ".csv"):
             try: s = p.read_text()
