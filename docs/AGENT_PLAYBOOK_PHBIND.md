@@ -85,6 +85,9 @@ generator's own confidence; global ipTM (reads 0.86 on a negative control that g
 ## 8. More throughput: waves on other cards or machines
 One card screens ~150 designs/hour. A second card or machine runs a **wave** (`phbind/wave.py`, `docs/WAVES_AND_SECOND_MACHINES.md`): same pipeline, its own campaign tag, `seed_base` and hotspot-set aliases so it never regenerates another wave's backbones, results returned as small CSVs. `python phbind/wave.py --plan` shows what is done (decided from real artifacts) before any GPU time is spent.
 
-## 9. Where the evidence lives
+## 9. The shared submission ranking
+Several agents can maintain ONE ranking without overwriting each other: an append-only evidence ledger plus a rule-based ranker (`phbind/ranking.py`, usage in `docs/SHARED_RANKING.md`). Agents record measurements with `rank.py add` (design, metric, value, seeds, source note); tiers, merit and the suggested submission row order are recomputed by rule. Never hand-edit the output.
+
+## 10. Where the evidence lives
 `docs/HOMO_OLIGOMER_TARGETS.md` (the contract and measurements), `docs/JUDGE_REGIME.md` (benchmark findings on a second model), `docs/REPORT.md` (single-chain benchmark, fast-screen
 calibration), `phbind/validation.json` (per-scorer records), `out/phbind/experiments.jsonl` (what has been tried).
