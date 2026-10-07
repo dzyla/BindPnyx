@@ -106,7 +106,7 @@ def rank(top: int | None = None) -> pd.DataFrame:
         rows.append(dict(design_id=x.design_id, lineage=x.lineage, generator=x.generator, length=(len(x.sequence) if x.sequence else (x.length or "")), **c,
                          contract=("ok" if x.sequence else "sequence needed"), missing=",".join(k for k in ("boltz_h_mean", "af3_h", "boltz_m_mean", "novelty_hits_qtm") if k not in v.index or pd.isna(v.get(k))), evidence_by=who, sequence=x.sequence, note=x.note))
     df = pd.DataFrame(rows); po = {"supported": 0}; mo = {"pass": 0, "na": 1, "fail": 2}      # only a multi-pose, significant pH shift counts as pH evidence (one pose has a spread of ~0.9 kcal/mol)
-    df["_k"] = list(zip(df.tier.map({"A": 0, "B": 1, "C": 2, "D": 3, "X": 4}), df.ph.map(lambda x: po.get(x, 1)), df.mouse.map(mo), -df.robust, -df.merit)); df = df.sort_values("_k", kind="stable").drop(columns="_k").reset_index(drop=True)
+    df["_k"] = list(zip(df.tier.map({"A": 0, "B": 1, "C": 2, "D": 3, "X": 4}), df.ph.map(lambda x: po.get(x, 1)), df.mouse.map(mo), (df.novelty == "thin").astype(int), -df.robust, -df.merit)); df = df.sort_values("_k", kind="stable").drop(columns="_k").reset_index(drop=True)
     df.insert(0, "rank", range(1, len(df) + 1)); order = row_order(df, r); df["row_order"] = df.design_id.map({k: i + 1 for i, k in enumerate(order)})
     return df
 
@@ -115,7 +115,7 @@ def write(df: pd.DataFrame, top: int | None = None):
     ordr = df[df.row_order.notna()].sort_values("row_order")
     L = [f"# Final ranking (regenerated {time.strftime('%Y-%m-%d %H:%M')} from `evidence.csv` by `ranking.py rank`; do not edit)", "",
          "Tiers: **A** Boltz-2 >= 0.5 AND AlphaFold3 >= 0.5 on human (the two-model consensus; extra Boltz seeds add robustness, not eligibility) with a clean/thin novelty result; **B** passes on one model with the other near/missing (or novelty unscreened), or is a novelty-clean mouse binder; "
-         "**C** the models disagree (one passes, the other rejects); **D** below; **X** excluded (novelty fail). Within a tier: pH evidence, then mouse, then 5-seed robustness, then mean of the two oracles. `row_order` is the suggested submission order (lineage-capped, no adjacent repeats).", "",
+         "**C** the models disagree (one passes, the other rejects); **D** below; **X** excluded (novelty fail). Within a tier: pH evidence, then mouse, then a CLEAN novelty margin before a thin one, then 5-seed robustness, then mean of the two oracles. `row_order` is the suggested submission order (lineage-capped, no adjacent repeats).", "",
          f"## Suggested submission order (first {n} are screened, in this order)", "", "| row | design | lineage | tier | merit | boltz h | af3 h | mouse | novelty | pH | missing |", "|---|---|---|---|---|---|---|---|---|---|---|"]
     for x in ordr.head(n).itertuples(): L.append(f"| {int(x.row_order)} | {x.design_id} | {x.lineage} | {x.tier} | {x.merit} | {x.boltz_h} | {x.af3_h} | {x.mouse} | {x.novelty} | {x.ph} | {x.missing or '-'} |")
     ex = df[df.tier == "X"]; L += ["", f"## Counts", "", df.tier.value_counts().sort_index().to_string(), "", f"## Excluded (novelty fail): {', '.join(ex.design_id) if len(ex) else 'none'}",

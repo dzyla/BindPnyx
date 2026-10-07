@@ -145,3 +145,18 @@ def test_gate_needs_both_models_orders_by_mean_and_never_scores_with_one_model()
     assert t.loc["a", "tier"] == "A" and t.loc["c", "tier"] == "B" and t.loc["b", "tier"] == "-"
     assert pd.isna(t.loc["d", "consensus"]) and not t.loc["d", "consensus_pass"]    # missing model -> NaN, never Boltz alone
     assert t.loc["b", "model_gap"] == pytest.approx(0.60)
+
+
+def test_mouse_scoring_uses_the_mouse_sequence_and_msa_not_the_human_ones(tmp_path, monkeypatch):
+    import pandas as pd
+    from phbind import boltz_trimer as B, trimer as T
+    h, m = tmp_path / "h.a3m", tmp_path / "m.a3m"; h.write_text(">q\n" + T.TNF_HUMAN + "\n"); m.write_text(">q\n" + T.TNF_MOUSE + "\n")
+    monkeypatch.setattr(B, "_MANIFEST", {"files": {"msa_human": {"path": str(h)}, "msa_mouse": {"path": str(m)}}})
+    assert B.target_for("human") == (T.TNF_HUMAN, str(h), 471) and B.target_for("mouse") == (T.TNF_MOUSE, str(m), 468)
+    with pytest.raises(ValueError):
+        B.target_for("rat")
+    df = pd.DataFrame({"id": ["d1"], "seq": ["ACDEFGHIKLMNPQRSTVWY" * 3]})
+    y = (B.write_yamls(df, tmp_path / "mo", "mouse") / "d1.yaml").read_text()
+    assert T.TNF_MOUSE in y and T.TNF_HUMAN not in y and str(m) in y and str(h) not in y
+    y = (B.write_yamls(df, tmp_path / "hu") / "d1.yaml").read_text()          # default stays human
+    assert T.TNF_HUMAN in y and T.TNF_MOUSE not in y and str(h) in y

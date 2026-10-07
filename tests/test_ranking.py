@@ -121,3 +121,11 @@ def test_alternation_may_only_move_a_design_down_a_little(rk):
     ev("tiny", boltz_h_mean=0.52, boltz_h_n=1, af3_h=0.51, novelty_hits_qtm=0, novelty_best_qtm=0.6)       # same tier, lowest merit
     o = R.rank().dropna(subset=["row_order"]).sort_values("row_order").design_id.tolist()
     assert o.index("tiny") >= 3                              # a weak design in the same tier is not hauled up to row 2 just to break up a lineage
+
+
+def test_a_thin_novelty_margin_ranks_below_a_clean_one_in_the_same_tier(rk):
+    reg("clean", 0, lineage="L1"); reg("thin", 1, lineage="L2")
+    base = dict(boltz_h_mean=0.8, boltz_h_worst=0.7, boltz_h_n=5, af3_h=0.7)
+    ev("clean", **base, novelty_hits_qtm=0, novelty_best_qtm=0.65)
+    ev("thin", **{**base, "boltz_h_mean": 0.9, "af3_h": 0.8}, novelty_hits_qtm=0, novelty_best_qtm=0.79)           # better scores, margin 0.01 under the 0.80 line
+    df = R.rank().set_index("design_id"); assert df.loc["thin", "tier"] == df.loc["clean", "tier"] == "A" and df.loc["clean", "rank"] < df.loc["thin", "rank"]

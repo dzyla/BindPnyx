@@ -43,6 +43,19 @@ def msa_human() -> str:
     return manifest()["files"]["msa_human"]["path"]
 
 
+def msa_mouse() -> str:
+    return manifest()["files"]["msa_mouse"]["path"]
+
+
+def target_for(species: str):
+    """(construct sequence, canonical NUL-fixed MSA, residues in the 3-copy oracle target). The species picks all three together; mixing them is the error this prevents."""
+    if species == "human":
+        return T.TNF_HUMAN, msa_human(), 3 * len(T.TNF_HUMAN)
+    if species == "mouse":
+        return T.TNF_MOUSE, msa_mouse(), 3 * len(T.TNF_MOUSE)
+    raise ValueError(f"species must be 'human' or 'mouse', got {species!r}")
+
+
 FOOT = {"B": [87, 88, 90], "C": [21, 33, 65, 67, 113, 115, 144, 145, 146]}   # confirmed-binder footprint (12)
 GROOVES = [("A", "B"), ("B", "C"), ("C", "A")]        # the three C3-equivalent (face-on-X, face-on-Y) pairs
 BINDER_RE = re.compile(r"^[ACDEFGHIKLMNPQRSTVWY]{10,250}$")
@@ -53,15 +66,16 @@ def boltz_bin():
     return common.BOLTZ()
 
 
-def write_yamls(df: pd.DataFrame, out: Path) -> Path:
+def write_yamls(df: pd.DataFrame, out: Path, species: str = "human") -> Path:
     """df: id, seq.  One YAML per design in <out>/yaml. Binder validity is asserted, not assumed."""
+    tseq, tmsa, _ = target_for(species)
     d = out / "yaml"
     shutil.rmtree(d, ignore_errors=True)
     d.mkdir(parents=True)
     assert df["id"].is_unique, "duplicate design ids"
     for r in df.itertuples():
         assert BINDER_RE.match(r.seq), f"{r.id}: invalid binder sequence"
-        T.write_boltz_yaml(d / f"{r.id}.yaml", T.TNF_HUMAN, msa_human(), r.seq)
+        T.write_boltz_yaml(d / f"{r.id}.yaml", tseq, tmsa, r.seq)
     assert len(list(d.glob("*.yaml"))) == len(df)
     return d
 
@@ -70,13 +84,13 @@ def _done(root: Path, i: str) -> bool:
     return (root / i / f"confidence_{i}_model_0.json").exists() and (root / i / f"pae_{i}_model_0.npz").exists()
 
 
-def run_seed(df: pd.DataFrame, out: Path, seed: int, recycles=3, steps=200, gpu=None) -> Path:
+def run_seed(df: pd.DataFrame, out: Path, seed: int, recycles=3, steps=200, gpu=None, species: str = "human") -> Path:
     """One Boltz-2 batch at `seed`. Resumable on real outputs. Raises if any design lacks output afterwards."""
     od = out / f"seed{seed}"
     root = od / "boltz_results_yaml" / "predictions"
     missing = [i for i in df["id"] if not _done(root, i)]
     if missing:
-        ydir = write_yamls(df[df["id"].isin(missing)], od / "todo")
+        ydir = write_yamls(df[df["id"].isin(missing)], od / "todo", species)
         # the input dir must be named 'yaml': boltz names its output after it
         shutil.rmtree(od / "boltz_results_yaml" / "processed", ignore_errors=True)
         env = None
@@ -130,7 +144,8 @@ def epitope_metrics(cif: str):
                 contacts_per_protomer=";".join(f"{c}={len(con[c])}" for c in tg))
 
 
-def score_seed(df: pd.DataFrame, out: Path, seed: int) -> pd.DataFrame:
+def score_seed(df: pd.DataFrame, out: Path, seed: int, species: str = "human") -> pd.DataFrame:
+    n_target = target_for(species)[2]
     root = out / f"seed{seed}" / "boltz_results_yaml" / "predictions"
     rows = []
     for r in df.itertuples():
@@ -138,9 +153,9 @@ def score_seed(df: pd.DataFrame, out: Path, seed: int) -> pd.DataFrame:
         pae = np.load(d / f"pae_{r.id}_model_0.npz")["pae"].astype(float)
         cj = json.load(open(d / f"confidence_{r.id}_model_0.json"))
         cif = sorted(d.glob("*_model_0.cif"))[0]
-        ti, bi, info = T.group_indices(str(cif), species="human", binder_seq=r.seq, pae_n=pae.shape[0])
-        assert info["n_target_residues"] == 471 and info["target_chains"] == ["A", "B", "C"]
-        assert info["chain_order"] == ["A", "B", "C", "D"] and pae.shape == (471 + len(r.seq),) * 2
+        ti, bi, info = T.group_indices(str(cif), species=species, binder_seq=r.seq, pae_n=pae.shape[0])
+        assert info["n_target_residues"] == n_target and info["target_chains"] == ["A", "B", "C"]
+        assert info["chain_order"] == ["A", "B", "C", "D"] and pae.shape == (n_target + len(r.seq),) * 2
         lo, hi = T.ipsae_grouped(pae, ti, bi)
         pc = cj["pair_chains_iptm"]      # {i: {j: v}} keyed by chain index as strings; binder is chain 3 (asserted above)
         b2t = float(np.mean([pc["3"][str(k)] for k in range(3)] + [pc[str(k)]["3"] for k in range(3)]))
@@ -148,19 +163,20 @@ def score_seed(df: pd.DataFrame, out: Path, seed: int) -> pd.DataFrame:
                    pae_iface_min=T.pae_interface_min_grouped(pae, ti, bi),
                    iptm_global=cj.get("iptm"), b2t_pair_iptm=b2t,
                    cif=str(cif))
-        row.update(epitope_metrics(str(cif)))
+        # epitope descriptors use human numbering (P1x faces, footprint); not defined for the mouse target, where they are reported as NaN/'na'
+        row.update(epitope_metrics(str(cif)) if species == "human" else dict(p1x_recall=float("nan"), foot_recall=float("nan"), groove="na", n_prot_engaged=-1, contacts_per_protomer=""))
         rows.append(row)
     return pd.DataFrame(rows)
 
 
-def run(df: pd.DataFrame, out: Path, seeds, **kw) -> pd.DataFrame:
+def run(df: pd.DataFrame, out: Path, seeds, species: str = "human", **kw) -> pd.DataFrame:
     """All seeds, ONE batch per seed (never split: --seed is global, so batch composition matters).
     Returns the per-seed table. Reference designs must be inside df."""
     out = Path(out)
     parts = []
     for s in seeds:
-        run_seed(df, out, s, **kw)
-        parts.append(score_seed(df, out, s))
+        run_seed(df, out, s, species=species, **kw)
+        parts.append(score_seed(df, out, s, species))
     res = pd.concat(parts, ignore_index=True)
     res.to_csv(out / "per_seed.csv", index=False)
     return res
