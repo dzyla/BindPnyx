@@ -1,16 +1,102 @@
 {
- "boltz": {"status": "validated", "roles": {"screen": true, "gate": true}, "weak": true,
-  "measured": {"n_real": 4, "real_recall": 0.25, "n_ref_pass": 5, "reference_recall": 1.0, "n_ref_fail": 15, "reference_fp_rate": 0.4, "spearman_vs_reference": 0.90},
-  "why": "", "evidence": "1 seed vs a 5-seed Boltz-derived reference: it re-measures itself (seeds correlate 0.77-0.93), so its sensitivity is inflated and its false positives are seed noise. Recovers 1 of 4 solved TNF binders."},
- "af3": {"status": "validated", "roles": {"screen": false, "gate": true}, "weak": true,
-  "measured": {"n_real": 4, "real_recall": 0.0, "n_ref_pass": 5, "reference_recall": 0.2, "n_ref_fail": 15, "reference_fp_rate": 0.0, "spearman_vs_reference": 0.41, "spearman_vs_boltz": 0.25},
-  "why": "", "evidence": "5-sample mean; both models >= 0.5 recovered 1/5 reference passes at 0/15 false positives; 0/4 solved binders. ~36 s/design batched (60-75 s per-design process). Its 0.5 gate is uncalibrated."},
- "ptx": {"status": "validated", "roles": {"screen": false, "gate": true}, "weak": true,
-  "measured": {"n_real": 5, "real_recall": 0.0, "n_ref_pass": 5, "reference_recall": 0.6, "n_ref_fail": 15, "reference_fp_rate": 0.13, "spearman_vs_boltz": 0.22},
-  "why": "", "evidence": "Protenix-v2: both models >= 0.5 recovered 3/5 reference passes at 0/15 false positives; 0/5 solved binders. Non-default alternative to AF3."},
- "of3": {"status": "validated", "roles": {"screen": false, "gate": false}, "weak": true,
-  "measured": {"n_real": 5, "real_recall": 0.0, "n_ref_pass": 5, "reference_recall": 0.0, "n_ref_fail": 15, "reference_fp_rate": 0.27, "spearman_vs_boltz": -0.16},
+ "boltz": {
+  "status": "validated",
+  "roles": {
+   "screen": true,
+   "gate": true
+  },
+  "weak": true,
+  "measured": {
+   "n_real": 4,
+   "real_recall": 0.25,
+   "n_ref_pass": 5,
+   "reference_recall": 1.0,
+   "n_ref_fail": 15,
+   "reference_fp_rate": 0.4,
+   "spearman_vs_reference": 0.9
+  },
+  "why": "",
+  "evidence": "1 seed vs a 5-seed Boltz-derived reference: it re-measures itself (seeds correlate 0.77-0.93), so its sensitivity is inflated and its false positives are seed noise. Recovers 1 of 4 solved TNF binders."
+ },
+ "af3": {
+  "status": "validated",
+  "roles": {
+   "screen": false,
+   "gate": true
+  },
+  "weak": true,
+  "measured": {
+   "n_real": 4,
+   "real_recall": 0.0,
+   "n_ref_pass": 5,
+   "reference_recall": 0.2,
+   "n_ref_fail": 15,
+   "reference_fp_rate": 0.0,
+   "spearman_vs_reference": 0.41,
+   "spearman_vs_boltz": 0.25
+  },
+  "why": "",
+  "evidence": "5-sample mean; both models >= 0.5 recovered 1/5 reference passes at 0/15 false positives; 0/4 solved binders. ~36 s/design batched (60-75 s per-design process). Its 0.5 gate is uncalibrated."
+ },
+ "ptx": {
+  "status": "validated",
+  "roles": {
+   "screen": false,
+   "gate": true
+  },
+  "weak": true,
+  "measured": {
+   "n_real": 5,
+   "real_recall": 0.0,
+   "n_ref_pass": 5,
+   "reference_recall": 0.6,
+   "n_ref_fail": 15,
+   "reference_fp_rate": 0.13,
+   "spearman_vs_boltz": 0.22
+  },
+  "why": "",
+  "evidence": "Protenix-v2: both models >= 0.5 recovered 3/5 reference passes at 0/15 false positives; 0/5 solved binders. Non-default alternative to AF3."
+ },
+ "of3": {
+  "status": "validated",
+  "roles": {
+   "screen": false,
+   "gate": false
+  },
+  "weak": true,
+  "measured": {
+   "n_real": 5,
+   "real_recall": 0.0,
+   "n_ref_pass": 5,
+   "reference_recall": 0.0,
+   "n_ref_fail": 15,
+   "reference_fp_rate": 0.27,
+   "spearman_vs_boltz": -0.16
+  },
   "why": "no signal: exactly 0.0 interface confidence on every solved binder and every reference pass although it uses the MSA (bare trimer pTM 0.91 with, 0.24 without)",
-  "evidence": "ipTM and ipSAE at PAE cutoffs 10-30 A all uncorrelated or inverse vs the reference. The benchmark ranking that favoured it on other targets did not transfer."},
- "ptx_fast": {"status": "untested", "roles": {"screen": false, "gate": false}, "why": "Protenix-0.5-mini 'fast' has single-chain-target calibration only (docs/REPORT.md: AUROC 0.62-0.65 vs wet-lab labels, 3-5x enricher, Spearman 0.43-0.59 vs Boltz-2); never run on the trimer. Run phbind/validate.py ptx_fast."}
+  "evidence": "ipTM and ipSAE at PAE cutoffs 10-30 A all uncorrelated or inverse vs the reference. The benchmark ranking that favoured it on other targets did not transfer."
+ },
+ "ptx_fast": {
+  "status": "validated",
+  "roles": {
+   "screen": false,
+   "gate": false
+  },
+  "weak": true,
+  "measured": {
+   "n_real": 4,
+   "real_recall": 0.0,
+   "n_ref_pass": 5,
+   "reference_recall": 0.0,
+   "n_ref_fail": 15,
+   "reference_fp_rate": 0.0,
+   "auroc_vs_boltz_ge_0_5": 0.559,
+   "spearman_vs_boltz": 0.17,
+   "top30pct_recovers_boltz_passers": 0.38,
+   "fraction_scores_exactly_zero": 0.89,
+   "s_per_design": 1.6
+  },
+  "why": "no usable signal on the trimer: ipSAE is exactly 0 for 89% of designs (82% of the designs Boltz-2 passes), AUROC 0.56 for Boltz-2 >= 0.5, top 30% recovers 38% (random 30%), 0/5 reference passers, 0/4 solved binders",
+  "evidence": "269 designs in one batch (95 Boltz>=0.5 + 150 random lower + 20 reference + 4 real binders). Its single-chain calibration (AUROC 0.62-0.65 vs wet-lab labels, Spearman 0.43-0.59 vs Boltz-2, 3-5x enrichment) did not transfer to the 471-residue homotrimer; ~11x cheaper does not matter when the score is zero."
+ }
 }

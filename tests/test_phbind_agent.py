@@ -38,9 +38,14 @@ def test_registry_refuses_a_scorer_for_a_role_its_record_does_not_support():
         scorers.require("of3", "gate")                                              # measured: exactly 0.0 on every real binder
     with pytest.raises(scorers.ScorerRefused):
         scorers.require("af3", "screen")                                            # too insensitive to pre-filter
+    with pytest.raises(scorers.ScorerRefused, match="no usable signal"):
+        scorers.require("ptx_fast", "screen")                                       # tested on the trimer: exactly 0 for 89% of designs
+    assert scorers.require("ptx_fast", "screen", force=True).prefix == "ptxf"
+    import tempfile
+    f = Path(tempfile.mkdtemp()) / "v.json"; f.write_text(json.dumps({"ptx": {"status": "untested"}}))
     with pytest.raises(scorers.ScorerRefused, match="no validation record"):
-        scorers.require("ptx_fast", "screen")                                       # never run on the trimer
-    assert scorers.require("ptx_fast", "screen", allow_untested=True).prefix == "ptxf"
+        scorers.require("ptx", "screen", path=f)                                    # an untested scorer is refused until validated
+    assert scorers.require("ptx", "screen", path=f, allow_untested=True)
     assert scorers.require("of3", "gate", force=True)
     with pytest.raises(KeyError):
         scorers.require("alphafold9", "gate")

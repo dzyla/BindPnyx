@@ -38,7 +38,7 @@ identical legs.) A pass means two predictors agree on an interface, not that the
 | binder length | `generate.lengths` | 62-112 | passers cluster 104-112 and 62-86; 110-130 aa Ig-like is a novelty trap | per length 100 backbones |
 | sequence model | `generate.mpnn` | SolubleMPNN only | plain ProteinMPNN gave poor binders (user decision, release data: 4.8% vs 27.9%); config refuses it | - |
 | screen cut | `prescreen.cut` | 0.35 | 0.45 kept 5/5 reference passers but 7/7 has a 95% interval of [0.59, 1.0] | re-score a reference set |
-| screen scorer | `prescreen.scorer` | boltz (1 seed) | only scorer with screen validation; a cheaper one (`ptx_fast`) is UNTESTED here | see section 4 |
+| screen scorer | `prescreen.scorer` | boltz (1 seed) | only scorer with screen validation; the cheaper `ptx_fast` was TESTED and fails on the trimer (AUROC 0.56, 89% of scores exactly 0) | see section 4 |
 | gate legs | `gate.legs` | boltz + af3 | Protenix-v2 is the validated alternative (3/5 reference passers, 0/15 false positives); OpenFold3 is refused (exactly 0.0 on every real binder) | `validate.py` ~10 min |
 | gate thresholds | `gate.gate/strong` | 0.5 / 0.65 | fitted on the MIN direction; the max direction is biased +0.165 and would loosen it. AF3's 0.5 is uncalibrated | needs labelled designs |
 | AF3 samples | `gate.af3_samples` | 5 | 5 samples cost the same as 1 (trunk dominates) and agree within a design | - |
@@ -73,7 +73,7 @@ generator's own confidence; global ipTM (reads 0.86 on a negative control that g
 
 ## 7. Open problems an agent can take (highest value first)
 1. **Mouse scoring in this driver** (species switch: 468-residue mouse trimer, mouse MSA; score per finalist and per variant; never inherited).
-2. **Validate `ptx_fast`** as a cheaper prescreen on the trimer (documented single-chain calibration: Spearman 0.43-0.59 vs Boltz-2, 3-5x enrichment; untested here).
+2. ~~Validate `ptx_fast`~~ done: it fails on the trimer (see `validation.json`); a cheaper prescreen needs a different model or a different readout.
 3. **Structure clustering of passers** (TM-align on binder chains) so lineages are counted by fold, not sequence.
 4. **pH variants** on the best gated designs, each re-gated on both models and mouse, anti-pattern census on the refolded child.
 5. **Calibrate the gate** on labelled designs (the public release) with the pair fixed.
