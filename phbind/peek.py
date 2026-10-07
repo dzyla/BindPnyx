@@ -16,10 +16,10 @@ for od in sorted(S.OUT.glob("b[0-9][0-9][0-9]")):
     if ids:
         r = B.score_seed(pd.DataFrame({"id": ids, "seq": [seq[i] for i in ids]}), od, 101); r = r.merge(meta[["id", "bb", "set", "L", "run"]], on="id"); r["partial"] = True; parts.append(r)
 a = pd.concat([done] + parts, ignore_index=True); a = a[~a.id.str.startswith("carrier")]
-a["cut45"] = a.ipsae_min >= S.SCREEN_CUT; a["cut60"] = a.ipsae_min >= 0.60
-print(f"{len(a)} designs scored ({int(a.partial.sum())} from the running batch)  |  >=0.45: {a.cut45.sum()} ({100*a.cut45.mean():.1f}%)  >=0.60: {a.cut60.sum()} ({100*a.cut60.mean():.1f}%)")
-print(a.groupby("set")[["cut45", "cut60"]].agg(["sum", "count"]).iloc[:, [0, 1, 2]].rename(columns={"sum": "n_pass"}).to_string()); print(a.groupby("L")[["cut45", "cut60"]].mean().round(3).T.to_string())
-out = a[a.cut45].sort_values("ipsae_min", ascending=False).copy(); out["sequence"] = [seq[i] for i in out.id]
+a["pass_screen"] = a.ipsae_min >= S.SCREEN_CUT; a["pass45"] = a.ipsae_min >= 0.45; a["cut60"] = a.ipsae_min >= 0.60
+print(f"{len(a)} designs scored ({int(a.partial.sum())} from the running batch)  |  >={S.SCREEN_CUT} (screen cut): {a.pass_screen.sum()} ({100*a.pass_screen.mean():.1f}%)  >=0.45: {a.pass45.sum()} ({100*a.pass45.mean():.1f}%)  >=0.60: {a.cut60.sum()} ({100*a.cut60.mean():.1f}%)")
+print(a.groupby("set")[["pass_screen", "pass45", "cut60"]].agg(["sum", "count"]).rename(columns={"sum": "n_pass"}).to_string()); print(a.groupby("L")[["pass_screen", "pass45", "cut60"]].mean().round(3).T.to_string())
+out = a[a.pass_screen].sort_values("ipsae_min", ascending=False).copy(); out["sequence"] = [seq[i] for i in out.id]
 cols = ["id", "sequence", "binder_len", "set", "L", "bb", "ipsae_min", "ipsae_max", "b2t_pair_iptm", "foot_recall", "p1x_recall", "groove", "n_prot_engaged", "partial", "cif"]
 def sse(cif):
     import biotite.structure.io as bio, biotite.structure as bs, numpy as np

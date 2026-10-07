@@ -10,7 +10,9 @@ from pathlib import Path
 import pandas as pd
 REPO = Path(__file__).resolve().parent.parent; sys.path.insert(0, str(REPO))
 from phbind import boltz_trimer as B
-BATCH, SEED = 72, 101
+from phbind import config as _cfg
+_P = _cfg.load()["prescreen"]
+BATCH, SEED = _P["batch"], _P["seed"]
 OUT = REPO / "out/phbind/s2"
 CARRIERS_CSV = Path(os.environ.get("PHBIND_CARRIERS", REPO / "out/phbind/carriers.csv"))
 
@@ -50,7 +52,7 @@ def main(src=REPO / "out/phbind/designs_all.csv"):
 if __name__ == "__main__": main()
 
 
-SCREEN_CUT = 0.35   # 1-seed grouped ipSAE(min) cut taking designs to the 5-seed gate. Lowered 0.45 -> 0.35 after SHARED_BRIEFING 9.6: with 7 sibling positives the recall CI is [0.59, 1.0],
+SCREEN_CUT = _P["cut"]   # 1-seed grouped ipSAE(min) cut taking designs to the 5-seed gate. Lowered 0.45 -> 0.35 after SHARED_BRIEFING 9.6: with 7 sibling positives the recall CI is [0.59, 1.0],
                     # and every PXDesign backbone is a new lineage (the cut is an economy only inside a lineage already understood). SHARED_BRIEFING 1.2: 7/7 sibling seed-unanimous designs >= 0.69 at one seed,
                     # cut 0.45 kept 7/7 and dropped 46%; reproduced here on the 20 known designs (5/5 gate-passers >= 0.63 at each of 3 seeds, n=5, wide interval).
 def shortlist(cut=SCREEN_CUT):

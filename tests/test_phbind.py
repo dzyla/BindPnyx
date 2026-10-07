@@ -132,11 +132,16 @@ def test_his_variants_differ_only_at_declared_positions_and_never_add_cys():
     assert max(len(p) for _, p in v.values()) <= 3         # one-shot His count is capped: three broke 4/6 scaffolds in a measured campaign
 
 
-def test_gate_passes_on_min_and_orders_by_mean_and_never_scores_with_one_oracle():
+def test_gate_needs_both_models_orders_by_mean_and_never_scores_with_one_model():
     import s3_gate
-    s = pd.DataFrame(dict(id=["a", "b", "c", "d"], gate_pass=[True, True, True, False], ipsae_mean=[0.70, 0.90, 0.80, 0.95]))
-    o = pd.DataFrame(dict(id=["a", "b", "c"], of3_ipsae_min=[0.80, 0.30, 0.78], of3_ipsae_max=[0.9] * 3))   # d has no OpenFold3 result
-    t = s3_gate.combine(s, o).set_index("id")
-    assert list(t.index[:2]) == ["c", "a"]                                    # passers first, ordered by mean (0.79 > 0.75)
-    assert not t.loc["b", "consensus_pass"] and t.loc["b", "consensus"] == pytest.approx(0.60)    # b: high Boltz, OpenFold3 fails the gate
-    assert pd.isna(t.loc["d", "consensus"]) and not t.loc["d", "consensus_pass"]                  # missing oracle -> NaN, not Boltz alone
+    b = pd.DataFrame(dict(id=["a", "b", "c", "d", "e"], ipsae_min=[0.70, 0.90, 0.80, 0.95, 0.40]))
+    o = pd.DataFrame(dict(id=["a", "b", "c", "e"], af3_ipsae_min=[0.80, 0.30, 0.55, 0.9], af3_ipsae_max=[0.9] * 4))      # d: no second-model result
+    t = s3_gate.consensus(b, o).set_index("id")
+    assert list(t.index[:2]) == ["a", "c"]                                       # passers first, ordered by mean (0.75 > 0.675)
+    assert not t.loc["b", "consensus_pass"]                                      # high Boltz, second model disagrees -> no pass
+    assert not t.loc["e", "consensus_pass"]                                      # high second model, Boltz below the gate -> no pass
+    assert (t.second_model == "af3").all()                                        # the gate is Boltz-2 x1 + AF3 x1
+    assert s3_gate.consensus(b, o.rename(columns=lambda c: c.replace("af3_", "ptx_")), "ptx").second_model.eq("protenix-v2").all()
+    assert t.loc["a", "tier"] == "A" and t.loc["c", "tier"] == "B" and t.loc["b", "tier"] == "-"
+    assert pd.isna(t.loc["d", "consensus"]) and not t.loc["d", "consensus_pass"]    # missing model -> NaN, never Boltz alone
+    assert t.loc["b", "model_gap"] == pytest.approx(0.60)

@@ -36,6 +36,7 @@ Read `docs/RECOMMENDATIONS.md` for the why. This file is the playbook and the gu
 `funnel/` is single-chain; `funnel/common.py` raises on complexes with more than two chains. Use `phbind/` (guide: `docs/HOMO_OLIGOMER_TARGETS.md`): generate on a dimer shard,
 score on the intact oligomer, group all target copies as one in ipSAE, **gate on the MIN direction unless your own reference set says otherwise** (`phbind/convention_check.py`),
 screen with stratified batches that carry reference designs, and gate on counted output files (Boltz-2 exits 0 on a skipped input). Never use plain ProteinMPNN weights.
+**Agents: start at `docs/AGENT_PLAYBOOK_PHBIND.md`; `python phbind/run.py status` shows the state, `python phbind/run.py scorers` the validated scorers; a scorer is changed only through `phbind/validate.py` and logged with `phbind/experiments.py`.**
 
 ## Environment facts
 

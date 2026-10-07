@@ -6,9 +6,11 @@ from pathlib import Path
 import pandas as pd
 REPO = Path(__file__).resolve().parent.parent; sys.path.insert(0, str(REPO)); sys.path.insert(0, str(REPO / "phbind")); sys.path.insert(0, str(REPO / "funnel"))
 import s1_generate as S, common
-SETS = ["foot12", "decl8", "core6"]
-LENGTHS = [62, 68, 74, 78, 86, 96, 104, 112]        # 60-78 and 96-120 weighted, 79-95 shrunk (handoff 4.S1 reallocation hint)
-N_PER, SEQS = int(os.environ.get("S1_N", 100)), 2
+from phbind import config as _cfg
+_C = _cfg.load()["generate"]                       # PHBIND_CONFIG=... overrides; defaults are the settings the campaign ran with
+S.HOTSPOT_SETS.update(_C["hotspot_sets"])
+SETS, LENGTHS = _C["sets"], _C["lengths"]
+N_PER, SEQS = int(os.environ.get("S1_N", _C["backbones_per_run"])), _C["seqs_per_backbone"]
 GEN = REPO / "out/phbind/gen"
 
 def run_id(s, L): return f"{s}_L{L}"
