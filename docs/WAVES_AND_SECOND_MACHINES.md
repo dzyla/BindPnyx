@@ -3,6 +3,9 @@
 A **wave** is one self-contained campaign (generate -> pack -> novelty -> screen -> gate -> export) on one card, resumable, that returns only small CSVs. Two machines (or two cards) run two
 waves in parallel and the results are merged by CSV. Nothing is shared at run time except files in one drop folder.
 
+## One checkout per wave (enforced)
+Two waves in one checkout share `out/phbind` (batch numbering, `designs_all.csv`) and corrupt each other; `wave.py` refuses to start if another live campaign owns the checkout. Clone the repo once per concurrent wave.
+
 ## What must differ between waves (or you regenerate the same backbones)
 | thing | why | how |
 |---|---|---|

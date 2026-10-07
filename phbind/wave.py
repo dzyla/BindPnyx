@@ -97,8 +97,24 @@ def run_step(step, c, root: Path = REPO):
         f = handoff.predicted_files(c["gate"]["gate"], P["out"] / "s2", min(c["generate"]["lengths"])); handoff.write_tar(f, P["export"] / f"predicted_{P['camp']}.tar.gz", "predicted_binder")
         print(f"EXPORT READY: {P['results']} ({len(g)} designs) + {len(f)} predicted binder chains for a final novelty check", flush=True)
 
+def claim_checkout(c, root: Path = REPO):
+    """Two waves in one checkout share out/phbind (batch numbering, designs_all.csv) and corrupt each other. Refuse to run if a DIFFERENT campaign's process is alive in this checkout."""
+    import json, socket
+    f = Path(root) / "out/phbind/.wave_owner.json"; f.parent.mkdir(parents=True, exist_ok=True); camp = c["wave"]["campaign"] or "wave"
+    if f.exists():
+        o = json.loads(f.read_text())
+        alive = False
+        if o.get("host") == socket.gethostname() and o.get("pid") != os.getpid():
+            try: os.kill(int(o["pid"]), 0); alive = True
+            except (OSError, ValueError): alive = False
+        if alive and o.get("campaign") != camp:
+            raise SystemExit(f"this checkout is in use by campaign '{o['campaign']}' (pid {o['pid']}); give wave '{camp}' its own clone (two waves must not share out/phbind)")
+    f.write_text(json.dumps({"campaign": camp, "pid": os.getpid(), "host": socket.gethostname()}))
+
 def main(argv):
-    c = _config.load(); root = REPO; st = plan(c, root)
+    c = _config.load(); root = REPO
+    if "--plan" not in argv: claim_checkout(c, root)
+    st = plan(c, root)
     for s, done, note in st: print(f"{'done' if done else 'TODO':5s} {s:10s} {note}")
     if "--plan" in argv: return 0
     until = argv[argv.index("--until") + 1] if "--until" in argv else STEPS[-1]

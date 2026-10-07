@@ -158,3 +158,16 @@ def test_seed_base_is_a_validated_config_key_and_separates_campaigns():
     # PXDesign seed = seed_base + 1000*index(set) + length: two campaigns with different bases never share a seed for the same (set index, length)
     seeds = lambda base: {base + 1000 * i + L for i in range(3) for L in (120, 132, 144)}
     assert not seeds(a["generate"]["seed_base"]) & seeds(b["generate"]["seed_base"])
+
+
+def test_a_wave_refuses_a_checkout_that_another_live_wave_owns(tmp_path):
+    import json, os, socket
+    from phbind import wave
+    c = config.validate(config._merge(config.DEFAULTS, {"wave": {"campaign": "zl2"}}))
+    f = tmp_path / "out/phbind/.wave_owner.json"; f.parent.mkdir(parents=True)
+    f.write_text(json.dumps({"campaign": "zl1", "pid": os.getppid(), "host": socket.gethostname()}))      # a live process of ANOTHER campaign
+    with pytest.raises(SystemExit, match="own clone"):
+        wave.claim_checkout(c, tmp_path)
+    f.write_text(json.dumps({"campaign": "zl1", "pid": 2 ** 22 + 12345, "host": socket.gethostname()}))     # a dead owner: take over
+    wave.claim_checkout(c, tmp_path); assert json.loads(f.read_text())["campaign"] == "zl2"
+    f.write_text(json.dumps({"campaign": "zl2", "pid": os.getppid(), "host": socket.gethostname()})); wave.claim_checkout(c, tmp_path)   # the same campaign may resume
