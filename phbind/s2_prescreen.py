@@ -27,25 +27,35 @@ def carriers():
     return c
 
 
-def main(src=REPO / "out/phbind/designs_all.csv"):
-    """Order: first sequence of every backbone before any second sequence; WITHIN that, a seeded shuffle so every batch is a stratified
-    random sample of (hotspot set, length) and any early look is representative (the first ordering sorted by run name and batch 0 held only core6).
-    Batches already on disk are skipped; an interrupted batch is re-derived identically and resumed from its real predictions."""
+def eligible(d: pd.DataFrame, done: set, min_length=0, max_seq_index=99, novelty: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Designs still to screen, in order. Always: first sequence tier before the second; within a tier a seeded shuffle (every batch a representative sample).
+    With a novelty table (bbid|id, n_strict_hits): backbones that PASSED (0 strict hits) come first, UNSCREENED next, FAILED are never screened (a T1 backbone cannot be submitted,
+    whatever the oracle says). Pure, so it can be re-evaluated before every batch and pick up results as another session returns them."""
     import hashlib
+    d = d.copy(); L = d.id.str.extract(r"_L(\d+)_")[0].astype(int); d = d[(L >= min_length) & (d.k <= max_seq_index) & ~d.id.isin(done)]
+    d["h"] = d.id.map(lambda x: hashlib.md5(("s2" + x).encode()).hexdigest()); d["prio"] = 1
+    if novelty is not None and len(novelty):
+        key = "bbid" if "bbid" in novelty else "id"; nv = novelty.assign(bbid=novelty[key].astype(str).str.replace(r"_\d+$", "", regex=True) if key == "id" else novelty[key])
+        hits = nv.groupby("bbid").n_strict_hits.min(); bb = d.id.str.rsplit("_", n=1).str[0]; h = bb.map(hits)
+        d = d[~(h.fillna(0) > 0).reindex(d.index)]; d.loc[h.reindex(d.index).eq(0), "prio"] = 0
+    return d.sort_values(["prio", "k", "h"], kind="stable").reset_index(drop=True)
+
+def main(src=REPO / "out/phbind/designs_all.csv"):
+    """Batches already on disk are skipped; an interrupted batch is re-derived identically and resumed from its real predictions. The eligible list is recomputed before EVERY batch."""
     d = pd.read_csv(src); d["k"] = d.id.str.rsplit("_", n=1).str[1].astype(int)
-    assert d.id.is_unique and not d.id.str.startswith('carrier_').any()
+    assert d.id.is_unique and not d.id.str.startswith("carrier_").any()
     OUT.mkdir(parents=True, exist_ok=True); car = carriers()
-    done = {i for f in OUT.glob("batch_*.csv") for i in pd.read_csv(f).id}
-    d = d[~d.id.isin(done)].copy(); d["h"] = d.id.map(lambda x: hashlib.md5(("s2" + x).encode()).hexdigest())
-    d = d.sort_values(["k", "h"], kind="stable").reset_index(drop=True)
-    n0 = len(list(OUT.glob("batch_*.csv")))
-    for b in range((len(d) + BATCH - 1) // BATCH):
-        part = d.iloc[b * BATCH:(b + 1) * BATCH]; n = n0 + b; f = OUT / f"batch_{n:03d}.csv"
+    while True:
+        done = {i for f in OUT.glob("batch_*.csv") for i in pd.read_csv(f).id}
+        nf = _P.get("novelty_file"); nov = pd.read_csv(nf) if nf and Path(nf).exists() else None
+        todo = eligible(d, done, _P["min_length"], _P["max_seq_index"], nov)
+        if not len(todo): break
+        n = len(list(OUT.glob("batch_*.csv"))); part = todo.iloc[:BATCH]; f = OUT / f"batch_{n:03d}.csv"
         df = pd.concat([part[["id", "seq"]], car], ignore_index=True); od = OUT / f"b{n:03d}"
         B.run_seed(df, od, SEED); r = B.score_seed(df, od, SEED)
         r = r.merge(d[["id", "bb", "set", "L", "run", "k"]], on="id", how="left"); r["batch"] = n; r.to_csv(f, index=False)
         c = r[r.id.isin(car.id)].set_index("id").ipsae_min
-        print(f"batch {n}: {len(part)} designs; carriers (min-ipSAE): " + ", ".join(f"{k}={v:.3f}" for k, v in c.items()), flush=True)
+        print(f"batch {n}: {len(part)} designs ({int((part.prio == 0).sum())} novelty-passed); carriers (min-ipSAE): " + ", ".join(f"{k}={v:.3f}" for k, v in c.items()), flush=True)
         import shutil; shutil.rmtree(od / "todo", ignore_errors=True)
     print("S2 done")
 

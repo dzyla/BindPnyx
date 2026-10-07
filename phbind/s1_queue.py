@@ -32,6 +32,7 @@ def one(s, L):
 if __name__ == "__main__":
     for s in SETS:
         for L in LENGTHS: one(s, L)
-    parts = [pd.read_csv(GEN / run_id(s, L) / "designs.csv") for s in SETS for L in LENGTHS]
-    a = pd.concat(parts, ignore_index=True); assert a.id.is_unique and len(a) == len(SETS) * len(LENGTHS) * N_PER * SEQS
+    mine = [pd.read_csv(GEN / run_id(s, L) / "designs.csv") for s in SETS for L in LENGTHS]; assert sum(map(len, mine)) == len(SETS) * len(LENGTHS) * N_PER * SEQS
+    parts = [pd.read_csv(f) for f in sorted(GEN.glob("*/designs.csv"))]                  # designs_all.csv = EVERY finished run on disk, so a new campaign never drops an earlier one
+    a = pd.concat(parts, ignore_index=True); assert a.id.is_unique
     a.to_csv(REPO / "out/phbind/designs_all.csv", index=False); print("designs_all.csv", len(a), "sequences,", a.bb.nunique(), "backbone ids,", a.seq.nunique(), "distinct sequences")

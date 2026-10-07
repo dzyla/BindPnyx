@@ -19,7 +19,7 @@ DEFAULTS = {
         "backbones_per_run": 100, "seqs_per_backbone": 2, "diffusion_steps": 400,
         "mpnn": "soluble",                               # 'soluble' only: plain ProteinMPNN weights are refused
     },
-    "prescreen": {"scorer": "boltz", "seed": 101, "batch": 72, "cut": 0.35},   # cut: 1-seed grouped ipSAE (min); 0.45 was too tight (7/7 recall has CI [0.59, 1])
+    "prescreen": {"scorer": "boltz", "seed": 101, "batch": 72, "cut": 0.35, "min_length": 0, "max_seq_index": 99, "novelty_file": None},   # novelty_file: CSV (bbid|id, n_strict_hits) from a structural-novelty screen; novelty-passed designs go first, unscreened next, failed never. min_length / max_seq_index restrict WHICH designs a campaign screens (e.g. new long-binder runs, first sequence only)   # cut: 1-seed grouped ipSAE (min); 0.45 was too tight (7/7 recall has CI [0.59, 1])
     "gate": {"legs": ["boltz", "af3"], "gate": 0.5, "strong": 0.65, "af3_samples": 5, "rank": "mean"},
     "budget": {"max_gpu_hours": None},                   # informational for agents; stages do not enforce it
 }

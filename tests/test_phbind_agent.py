@@ -102,3 +102,23 @@ def test_status_counts_real_artifacts_not_directories(tmp_path):
     assert r["backbones_generated"] == 2 and r["designs_total"] == 6 and r["designs_screened"] == 3          # carriers are not designs; an empty pdbs/ dir counts for nothing
     assert r["survivors_at_cut"] == 2 and r["boltz_ge_0_5"] == 1 and r["last_carriers"] == {"carrier_x": 0.7}
     assert any("gate" in n for n in r["next"]) or any("prescreen" in n for n in r["next"])
+
+
+def test_prescreen_order_novelty_first_failed_never_and_tiers_before_shuffle():
+    from phbind import s2_prescreen as s2
+    d = pd.DataFrame({"id": [f"set_L120_{b}_{k}" for b in range(6) for k in (0, 1)]}); d["k"] = d.id.str.rsplit("_", n=1).str[1].astype(int); d["seq"] = "A" * 5
+    nov = pd.DataFrame({"bbid": ["set_L120_1", "set_L120_2", "set_L120_3"], "n_strict_hits": [0, 5, 0]})
+    o = s2.eligible(d, set(), novelty=nov)
+    assert not o.id.str.startswith("set_L120_2_").any()                           # a backbone with strict hits is never screened
+    first = list(o.id[:4]); assert all(x.startswith(("set_L120_1_", "set_L120_3_")) for x in first) and all(x.endswith("_0") for x in first[:2])   # novelty-passed first, first-sequence tier before the second
+    assert set(s2.eligible(d, set(), novelty=None).id) == set(d.id)                # no novelty table: nothing is dropped
+    assert not set(s2.eligible(d, {"set_L120_0_0"}).id) & {"set_L120_0_0"}         # done designs are skipped
+    assert len(s2.eligible(d, set(), min_length=130)) == 0 and len(s2.eligible(d, set(), max_seq_index=0)) == 6
+
+
+def test_handoff_extracts_only_the_binder_chain(tmp_path):
+    from phbind import handoff
+    pdb = "".join(f"ATOM  {i:5d}  CA  GLY {c}{i:4d}    {float(i):8.3f}{0.0:8.3f}{0.0:8.3f}  1.00  0.00           C\n" for i, c in ((1, "A"), (2, "B"), (3, "C"), (4, "C")))
+    out = handoff.chain_pdb(pdb, "C"); assert out.count("ATOM") == 2 and " A " not in out and out.endswith("END\n")
+    with pytest.raises(ValueError): handoff.chain_pdb(pdb, "Z")
+    n = handoff.write_tar({"bb1": out}, tmp_path / "x.tar.gz", "root"); import tarfile; assert n == 1 and tarfile.open(tmp_path / "x.tar.gz").getnames() == ["root/bb1.pdb"]

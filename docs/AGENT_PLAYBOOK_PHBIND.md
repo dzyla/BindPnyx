@@ -35,7 +35,8 @@ identical legs.) A pass means two predictors agree on an interface, not that the
 | knob | where | now | evidence | cost of testing |
 |---|---|---|---|---|
 | hotspot string | `generate.hotspot_sets/sets` | declared-8, footprint-12, 6-subset | first-pass 1-seed pass rate favoured declared-8; at the two-model gate 10/35 vs 7/30 vs 4/26 (no significant difference). Re-aimed vs declared is a null in the sibling campaign too | 100 backbones + screening ~ 40 min |
-| binder length | `generate.lengths` | 62-112 | passers cluster 104-112 and 62-86; 110-130 aa Ig-like is a novelty trap | per length 100 backbones |
+| structural novelty | `prescreen.novelty_file` | none (another session screens) | **Novelty is the filter that mattered: 18 of 21 two-model gate passers (62-112 aa) had a PDB structure matching at TM >= 0.8 over >= 70% of the chain, the portal's own failure rule, and every dual-species binder was among them.** Run it BEFORE any oracle (`phbind/handoff.py` packs structures for whoever has the search database; `s2_prescreen` then scores novelty-passed backbones first, unscreened next, failed never) | search time per query, no GPU |
+| binder length | `generate.lengths` | 62-112 (first campaign); 120-180 (second) | longer chains must match a larger fold over >= 70% of their length: 3/13 gate passers at >= 104 aa were novel vs 0/8 at <= 96 aa (a bet, not a result). Boltz-2 pass rate is not lower at 104-112 aa (7.8% vs 6.5%) | passers cluster 104-112 and 62-86; 110-130 aa Ig-like is a novelty trap | per length 100 backbones |
 | sequence model | `generate.mpnn` | SolubleMPNN only | plain ProteinMPNN gave poor binders (user decision, release data: 4.8% vs 27.9%); config refuses it | - |
 | screen cut | `prescreen.cut` | 0.35 | 0.45 kept 5/5 reference passers but 7/7 has a 95% interval of [0.59, 1.0] | re-score a reference set |
 | screen scorer | `prescreen.scorer` | boltz (1 seed) | only scorer with screen validation; the cheaper `ptx_fast` was TESTED and fails on the trimer (AUROC 0.56, 89% of scores exactly 0) | see section 4 |
@@ -72,6 +73,7 @@ generator's own confidence; global ipTM (reads 0.86 on a negative control that g
   outputs or reference designs (`scripts/check_public.py` must report 0 findings).
 
 ## 7. Open problems an agent can take (highest value first)
+0. **Put novelty first** (see the knob table) and learn which (hotspot set, length) cells produce backbones with zero strict PDB hits. A geometric predictor of the oracle does not exist here (gradient-boosted model on backbone features: AUROC 0.60), so novelty is the only cheap prefilter found.
 1. **Mouse scoring in this driver** (species switch: 468-residue mouse trimer, mouse MSA; score per finalist and per variant; never inherited).
 2. ~~Validate `ptx_fast`~~ done: it fails on the trimer (see `validation.json`); a cheaper prescreen needs a different model or a different readout.
 3. **Structure clustering of passers** (TM-align on binder chains) so lineages are counted by fold, not sequence.
