@@ -82,6 +82,9 @@ generator's own confidence; global ipTM (reads 0.86 on a negative control that g
 6. **Close the loop with wet-lab results**: record what was ordered and why; report binder rate per tier.
 7. A scorer that finds real binders. Boltz-2 recovers 1 of 4 solved TNF binders here and every other model tried recovers none; anything that moves this number is worth more than any tuning above.
 
-## 8. Where the evidence lives
+## 8. More throughput: waves on other cards or machines
+One card screens ~150 designs/hour. A second card or machine runs a **wave** (`phbind/wave.py`, `docs/WAVES_AND_SECOND_MACHINES.md`): same pipeline, its own campaign tag, `seed_base` and hotspot-set aliases so it never regenerates another wave's backbones, results returned as small CSVs. `python phbind/wave.py --plan` shows what is done (decided from real artifacts) before any GPU time is spent.
+
+## 9. Where the evidence lives
 `docs/HOMO_OLIGOMER_TARGETS.md` (the contract and measurements), `docs/JUDGE_REGIME.md` (benchmark findings on a second model), `docs/REPORT.md` (single-chain benchmark, fast-screen
 calibration), `phbind/validation.json` (per-scorer records), `out/phbind/experiments.jsonl` (what has been tried).

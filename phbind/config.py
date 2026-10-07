@@ -17,10 +17,12 @@ DEFAULTS = {
         "sets": ["foot12", "decl8", "core6"],            # which of hotspot_sets to run
         "lengths": [62, 68, 74, 78, 86, 96, 104, 112],   # binder lengths; >= 60 (novelty floor), keep out of the 110-130 Ig-like trap unless you can screen it
         "backbones_per_run": 100, "seqs_per_backbone": 2, "diffusion_steps": 400,
+        "seed_base": 100000,        # PXDesign seed = seed_base + 1000*index(set) + length. A second machine MUST use a different seed_base AND different set aliases, or it regenerates the same backbones under the same ids
         "mpnn": "soluble",                               # 'soluble' only: plain ProteinMPNN weights are refused
     },
-    "prescreen": {"scorer": "boltz", "seed": 101, "batch": 72, "cut": 0.35, "min_length": 0, "max_seq_index": 99, "novelty_file": None},   # novelty_file: CSV (bbid|id, n_strict_hits) from a structural-novelty screen; novelty-passed designs go first, unscreened next, failed never. min_length / max_seq_index restrict WHICH designs a campaign screens (e.g. new long-binder runs, first sequence only)   # cut: 1-seed grouped ipSAE (min); 0.45 was too tight (7/7 recall has CI [0.59, 1])
+    "prescreen": {"scorer": "boltz", "seed": 101, "batch": 72, "cut": 0.35, "min_length": 0, "max_seq_index": 99, "novelty_file": None, "sets": None},   # novelty_file: CSV (bbid|id, n_strict_hits) from a structural-novelty screen; novelty-passed designs go first, unscreened next, failed never. min_length / max_seq_index restrict WHICH designs a campaign screens (e.g. new long-binder runs, first sequence only)   # cut: 1-seed grouped ipSAE (min); 0.45 was too tight (7/7 recall has CI [0.59, 1])
     "gate": {"legs": ["boltz", "af3"], "gate": 0.5, "strong": 0.65, "af3_samples": 5, "rank": "mean"},
+    "wave": {"campaign": "", "novelty_wait_min": 20, "af3_cap": 60, "export_dir": None},   # phbind/wave.py: campaign tags the outputs; export_dir receives the result CSVs (the shared handoff dir)
     "budget": {"max_gpu_hours": None},                   # informational for agents; stages do not enforce it
 }
 ALLOWED_MPNN = ("soluble",)

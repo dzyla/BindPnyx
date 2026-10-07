@@ -122,3 +122,39 @@ def test_handoff_extracts_only_the_binder_chain(tmp_path):
     out = handoff.chain_pdb(pdb, "C"); assert out.count("ATOM") == 2 and " A " not in out and out.endswith("END\n")
     with pytest.raises(ValueError): handoff.chain_pdb(pdb, "Z")
     n = handoff.write_tar({"bb1": out}, tmp_path / "x.tar.gz", "root"); import tarfile; assert n == 1 and tarfile.open(tmp_path / "x.tar.gz").getnames() == ["root/bb1.pdb"]
+
+
+def _wave_tree(tmp_path, novelty=None, gated=False):
+    from phbind import wave
+    c = config.validate(config._merge(config.DEFAULTS, {"generate": {"hotspot_sets": {"decl8z": ["B75", "B86"], "core6z": ["B87", "B90"]}, "sets": ["decl8z", "core6z"], "lengths": [120, 132],
+                                                         "backbones_per_run": 2, "seqs_per_backbone": 1, "seed_base": 300000}, "prescreen": {"min_length": 120, "max_seq_index": 0},
+                                                         "wave": {"campaign": "zl1", "export_dir": str(tmp_path / "export"), "af3_cap": 2}}))
+    out = tmp_path / "out/phbind"; (out / "s2").mkdir(parents=True); ids = [f"{s}_L{L}_{k}_0" for s in ("decl8z", "core6z") for L in (120, 132) for k in (0, 1)]
+    for r in ("decl8z_L120", "decl8z_L132", "core6z_L120", "core6z_L132"):
+        d = out / "gen" / r; d.mkdir(parents=True); pd.DataFrame({"id": [i for i in ids if i.startswith(r + "_")]}).to_csv(d / "designs.csv", index=False)
+    pd.DataFrame({"id": ids, "seq": ["ACDEFGHIKL"] * len(ids)}).to_csv(out / "designs_all.csv", index=False)
+    pd.DataFrame({"id": ids[:6], "ipsae_min": [0.9, 0.8, 0.7, 0.6, 0.55, 0.2], "batch": 0, "cif": "x"}).to_csv(out / "s2" / "batch_000.csv", index=False)
+    if novelty is not None:
+        (tmp_path / "export").mkdir(exist_ok=True); novelty.to_csv(tmp_path / "export/novelty_backbones_zl1.csv", index=False)
+    return c, wave
+
+
+def test_wave_plan_reads_real_artifacts_and_survivors_respect_novelty_and_the_cap(tmp_path):
+    c, wave = _wave_tree(tmp_path)
+    st = {s: d for s, d, _ in wave.plan(c, tmp_path)}
+    assert st["generate"] is True and st["shard"] is False and st["pack"] is False and st["prescreen"] is False       # 2 designs per run complete; shard absent; 2 designs still unscreened
+    sv = wave.survivors(c, tmp_path); assert list(sv.id)[:2] == ["decl8z_L120_0_0", "decl8z_L120_1_0"] and len(sv) == 2     # best first, capped at af3_cap=2
+    nov = pd.DataFrame({"bbid": ["decl8z_L120_0", "decl8z_L120_1"], "n_strict_hits": [3, 0]})
+    old = pd.read_csv(tmp_path / "out/phbind/s2/batch_000.csv"); extra = pd.DataFrame({"id": ["decl8z_L62_0_0", "decl8z_L120_0_5"], "ipsae_min": [0.99, 0.99], "batch": 0, "cif": "x"})
+    pd.concat([old, extra]).to_csv(tmp_path / "out/phbind/s2/batch_000.csv", index=False)
+    assert not {"decl8z_L62_0_0"} & set(wave.survivors(c, tmp_path).id)                      # a design from a length this wave did not configure (an earlier campaign) is never a survivor
+    c, wave = _wave_tree(tmp_path / "b", novelty=nov); sv = wave.survivors(c, tmp_path / "b"); assert "decl8z_L120_0_0" not in set(sv.id) and "decl8z_L120_1_0" in set(sv.id)   # a novelty-failed backbone never reaches the AF3 leg
+
+
+def test_seed_base_is_a_validated_config_key_and_separates_campaigns():
+    a = config.load(); assert a["generate"]["seed_base"] == 100000
+    import json as _j, tempfile
+    f = Path(tempfile.mkdtemp()) / "c.json"; f.write_text(_j.dumps({"generate": {"seed_base": 300000}})); b = config.load(f)
+    # PXDesign seed = seed_base + 1000*index(set) + length: two campaigns with different bases never share a seed for the same (set index, length)
+    seeds = lambda base: {base + 1000 * i + L for i in range(3) for L in (120, 132, 144)}
+    assert not seeds(a["generate"]["seed_base"]) & seeds(b["generate"]["seed_base"])

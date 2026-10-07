@@ -25,13 +25,13 @@ def write_tar(files: dict, tar_path: Path, root: str) -> int:
             data = text.encode(); ti = tarfile.TarInfo(f"{root}/{name}.pdb"); ti.size = len(data); t.addfile(ti, io.BytesIO(data))
     return len(files)
 
-def backbone_files(min_length: int = 0, gen: Path | None = None) -> tuple[dict, pd.DataFrame]:
+def backbone_files(min_length: int = 0, gen: Path | None = None, runs: set | None = None) -> tuple[dict, pd.DataFrame]:
     """{bbid: binder-chain PDB} for every generated backbone with length >= min_length (chain C of the dimer-target complex)."""
     gen = Path(gen or OUT / "gen"); files, rows = {}, []
     for d in sorted(gen.glob("*_L*")):
         if not (d / "pdbs").exists() or not (d / "done.json").exists(): continue
         name, L = d.name.rsplit("_L", 1); L = int(L)
-        if L < min_length: continue
+        if L < min_length or (runs is not None and d.name not in runs): continue
         for p in sorted((d / "pdbs").glob("*.pdb")):
             k = int(p.stem.rsplit("_", 1)[1]); bb = f"{name}_L{L}_{k}"; files[bb] = chain_pdb(p.read_text(), "C"); rows.append(dict(bbid=bb, set=name, L=L, k=k))
     return files, pd.DataFrame(rows)

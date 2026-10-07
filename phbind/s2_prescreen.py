@@ -27,12 +27,13 @@ def carriers():
     return c
 
 
-def eligible(d: pd.DataFrame, done: set, min_length=0, max_seq_index=99, novelty: pd.DataFrame | None = None) -> pd.DataFrame:
+def eligible(d: pd.DataFrame, done: set, min_length=0, max_seq_index=99, novelty: pd.DataFrame | None = None, sets: list | None = None) -> pd.DataFrame:
     """Designs still to screen, in order. Always: first sequence tier before the second; within a tier a seeded shuffle (every batch a representative sample).
     With a novelty table (bbid|id, n_strict_hits): backbones that PASSED (0 strict hits) come first, UNSCREENED next, FAILED are never screened (a T1 backbone cannot be submitted,
     whatever the oracle says). Pure, so it can be re-evaluated before every batch and pick up results as another session returns them."""
     import hashlib
     d = d.copy(); L = d.id.str.extract(r"_L(\d+)_")[0].astype(int); d = d[(L >= min_length) & (d.k <= max_seq_index) & ~d.id.isin(done)]
+    if sets is not None: d = d[d.id.str.extract(r"^(.*)_L\d+_")[0].isin(sets)]          # restrict to this campaign's hotspot-set aliases
     d["h"] = d.id.map(lambda x: hashlib.md5(("s2" + x).encode()).hexdigest()); d["prio"] = 1
     if novelty is not None and len(novelty):
         key = "bbid" if "bbid" in novelty else "id"; nv = novelty.assign(bbid=novelty[key].astype(str).str.replace(r"_\d+$", "", regex=True) if key == "id" else novelty[key])
@@ -48,7 +49,7 @@ def main(src=REPO / "out/phbind/designs_all.csv"):
     while True:
         done = {i for f in OUT.glob("batch_*.csv") for i in pd.read_csv(f).id}
         nf = _P.get("novelty_file"); nov = pd.read_csv(nf) if nf and Path(nf).exists() else None
-        todo = eligible(d, done, _P["min_length"], _P["max_seq_index"], nov)
+        todo = eligible(d, done, _P["min_length"], _P["max_seq_index"], nov, _P.get("sets"))
         if not len(todo): break
         n = len(list(OUT.glob("batch_*.csv"))); part = todo.iloc[:BATCH]; f = OUT / f"batch_{n:03d}.csv"
         df = pd.concat([part[["id", "seq"]], car], ignore_index=True); od = OUT / f"b{n:03d}"

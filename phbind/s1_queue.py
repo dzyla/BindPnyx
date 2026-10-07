@@ -14,7 +14,7 @@ N_PER, SEQS = int(os.environ.get("S1_N", _C["backbones_per_run"])), _C["seqs_per
 GEN = REPO / "out/phbind/gen"
 
 def run_id(s, L): return f"{s}_L{L}"
-def seed_of(s, L): return 100000 + 1000 * SETS.index(s) + L      # unique per (set, length)
+def seed_of(s, L): return _C["seed_base"] + 1000 * SETS.index(s) + L      # unique per (set, length) within a campaign; seed_base separates campaigns/machines
 
 def one(s, L):
     rid = run_id(s, L); d = GEN / rid; csv = d / "designs.csv"
