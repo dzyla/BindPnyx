@@ -1,0 +1,24 @@
+{
+ "propka_k": {
+  "status": "sign and scale reproduced against one reference; single code path; NOT a measured pH switch",
+  "what": "organisers' tnf_ph_score layer K (PROPKA 3.5.1): k_release at pH 6.0 vs 7.4, positive = acid release; paired variant-minus-parent at the same seed, 5 poses",
+  "measured": {
+   "reference_variant_delta": "this scorer on 5 fresh Boltz-2 poses: +0.94 +/- 0.24; another agent's stack on 15 poses: +0.638 +/- 0.124 (about 1.1 combined SE apart)",
+   "same_script_same_poses": "a second agent's panel re-scored here reproduced its published delta and absolute release to 3 decimals; this checks the environment, not the method",
+   "run_to_run_sd_kcal_per_mol": 0.26,
+   "run_to_run_source": "5 variants, two independent Boltz-2 runs of the same sequences and seeds, one agent; binding ipSAE over the same structures moved 8x less (sd 0.034)",
+   "unresolved": "the absolute release of the inherited pH lead read +0.47 and -0.01 in two own runs against a reported +0.66; one run can move more than the quoted sd"
+  },
+  "rules_in_use": {
+   "supported": "n_pose >= 5, delta >= 0.5, z >= 2 (same as the ranker)",
+   "proposed_not_adopted": "every absolute pose release > 0 and every paired delta > 0 (a mean can hide a pose that binds harder at acid pH); needs all three agents",
+   "parent_baseline": "parents below about -1.2 (pH 6.0 vs 7.4, mean) cannot be rescued by a 1-2 His edit worth ~+1.2: do not spend a panel; of 82 long designs only 9 were above -0.5 and 37 were below -2"
+  },
+  "limits": [
+   "predicted poses, not measured structures; PROPKA is an empirical pKa model",
+   "no independent code path has re-scored these numbers yet",
+   "the scorer's own --selfcheck needs a control file that is not shipped; validation here is by reproduction, not by that check",
+   "quote any single pH mean with +/- 0.26"
+  ]
+ }
+}

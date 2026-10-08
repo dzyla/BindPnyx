@@ -91,3 +91,14 @@ Several agents can maintain ONE ranking without overwriting each other: an appen
 ## 10. Where the evidence lives
 `docs/HOMO_OLIGOMER_TARGETS.md` (the contract and measurements), `docs/JUDGE_REGIME.md` (benchmark findings on a second model), `docs/REPORT.md` (single-chain benchmark, fast-screen
 calibration), `phbind/validation.json` (per-scorer records), `out/phbind/experiments.jsonl` (what has been tried).
+
+
+## 10. The pH arm and the confirmation standard (added after the first full round)
+
+**Order of work for a pH objective.** (1) Triage parents by their pH baseline (`phbind/ph_score.py`: `baseline_ok`; a pose scores in ~2 s, so score the existing prescreen pose of every Boltz-passing design first). Parents far below zero cannot be rescued by a 1-2 histidine edit, and in our pool most were far below. (2) Variants on the survivors only (`s4_variants.py`: M3 pairs, M1 singles, <= 2 His in the list that is submitted). (3) Refold all variants in ONE batch with the parent and the carriers, filter: binding retained, <= 2 His, no His-to-carboxylate contact in ANY refolded pose. (4) AF3 and the other species on the survivors; nothing is inherited from the parent. (5) Paired multi-pose pH (`ph_score.summarise`), 5 poses minimum, plus a second independent run for anything that will be called a switch.
+
+**Boltz-2 is not reproducible run to run at a fixed seed** (GPU nondeterminism; not batch composition, host or kernel flag, each tested). Means move by ~0.02-0.1, the worst seed by up to 0.3, and a single-seed rank barely predicted which designs survived a 3-seed gate. Consequences: a worst-seed value near the bar (0.45-0.75) is within run-to-run error, so a replicate RUN is worth more than more seeds in one run; designs with margin are preferred over designs at the bar; pool seeds across independent runs before registering a value.
+
+**pH numbers carry about +/-0.26 kcal/mol per run** (`validation_ph.json`). Require every pose positive for any claim of a switch (proposed rule, not yet shared), report the worst pose next to the mean, and say that the number is a protonation model on predicted poses.
+
+**Standard of evidence for a final-list row:** >= 5 seeds on every species the objectives name; two independent runs for the headline designs; two different models; a failing carrier and a shuffle control in the batch; novelty screened on the design's own refolded backbone (point mutants barely move it, but screen, do not inherit).

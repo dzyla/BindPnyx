@@ -171,3 +171,39 @@ def test_a_wave_refuses_a_checkout_that_another_live_wave_owns(tmp_path):
     f.write_text(json.dumps({"campaign": "zl1", "pid": 2 ** 22 + 12345, "host": socket.gethostname()}))     # a dead owner: take over
     wave.claim_checkout(c, tmp_path); assert json.loads(f.read_text())["campaign"] == "zl2"
     f.write_text(json.dumps({"campaign": "zl2", "pid": os.getppid(), "host": socket.gethostname()})); wave.claim_checkout(c, tmp_path)   # the same campaign may resume
+
+
+def _poses(parent, variants, seeds=(101, 202, 303, 404, 505)):
+    rows = [dict(id="P", parent="P", role="parent", seed=s, rel60=parent[i]) for i, s in enumerate(seeds)]
+    for name, vals in variants.items(): rows += [dict(id=name, parent="P", role="variant", seed=s, rel60=vals[i]) for i, s in enumerate(seeds)]
+    return pd.DataFrame(rows)
+
+
+def test_ph_summary_is_paired_by_seed_and_the_worst_pose_check_catches_a_sign_reversal():
+    from phbind import ph_score as P
+    par = [-0.2, -0.3, -0.1, -0.2, -0.2]
+    r = P.summarise(_poses(par, {"clean": [0.9, 1.0, 0.8, 1.1, 0.9], "mean_only": [1.6, 1.5, 1.4, 1.8, -0.3]}))
+    c, m = r["variants"].loc["clean"], r["variants"].loc["mean_only"]
+    assert c.supported and c.all_positive and abs(c.d_mean - 1.1) < 0.05
+    assert m.d_mean > 1.0 and m.supported and not m.all_positive        # a good MEAN hides a pose that binds harder at acid pH: that is what the check is for
+    assert abs(r["parents"].loc["P", "rel_mean"] + 0.2) < 1e-9 and r["parents"].loc["P", "baseline_ok"]
+
+
+def test_ph_summary_refuses_unpaired_or_missing_data_and_baseline_triage_has_a_floor():
+    from phbind import ph_score as P
+    df = _poses([0.0] * 5, {"v": [1.0] * 5})
+    with pytest.raises(ValueError, match="no parent pose at seeds"):
+        P.summarise(df[~((df.role == "parent") & (df.seed == 505))])      # a variant pose with no parent at the same seed cannot be paired
+    with pytest.raises(ValueError, match="NaN"):
+        P.summarise(df.assign(rel60=df.rel60.where(df.seed != 101)))
+    assert P.baseline_ok(-1.0) and not P.baseline_ok(-2.7)               # parents far below zero are not worth a histidine panel
+    ok5 = P.summarise(_poses([0.0] * 5, {"v": [0.9, 1.0, 0.8, 1.1, 0.9]}))["variants"].loc["v"]
+    few = P.summarise(_poses([0.0] * 5, {"v": [0.9, 1.0, 0.8, 1.1, 0.9]}).query("seed <= 303"))["variants"].loc["v"]
+    assert ok5.supported and few.z > 5 and few.d_mean >= 0.5 and not few.supported      # same effect on 3 poses is large and significant but still not 'supported' (needs 5)
+
+
+def test_ph_validation_record_states_what_it_does_not_show():
+    import json
+    from pathlib import Path
+    rec = json.load(open(Path(__file__).resolve().parent.parent / "phbind" / "validation_ph.json"))["propka_k"]
+    assert "NOT a measured pH switch" in rec["status"] and rec["limits"] and "run_to_run_sd_kcal_per_mol" in rec["measured"]
