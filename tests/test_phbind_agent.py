@@ -207,3 +207,16 @@ def test_ph_validation_record_states_what_it_does_not_show():
     from pathlib import Path
     rec = json.load(open(Path(__file__).resolve().parent.parent / "phbind" / "validation_ph.json"))["propka_k"]
     assert "NOT a measured pH switch" in rec["status"] and rec["limits"] and "run_to_run_sd_kcal_per_mol" in rec["measured"]
+
+
+def test_ph_score_poses_worker_is_picklable_and_failures_raise(tmp_path, monkeypatch):
+    import pickle, types
+    from phbind import ph_score as P
+    pickle.dumps(P._score_one)                  # a process pool needs this; the first version defined the worker inside score_poses and could not run in parallel
+    fake = types.SimpleNamespace(score_one=lambda path, bc, tc, potts, wd, do: dict(k_status="ok" if "bad" not in path else "propka_not_installed", k_n_iface_ionisable=3, k_release_60v74=0.5, k_release_55v74=0.9))
+    monkeypatch.setattr(P, "_scorer", lambda: fake)
+    man = pd.DataFrame([dict(id="v", parent="p", role="variant", seed=101, file="v__seed101.pdb")])
+    out = P.score_poses(man, tmp_path, workers=1)
+    assert float(out.rel60.iloc[0]) == 0.5 and out.k_status.iloc[0] == "ok"
+    with pytest.raises(RuntimeError, match="failed to score"):
+        P.score_poses(pd.DataFrame([dict(id="v", parent="p", role="variant", seed=101, file="bad.pdb")]), tmp_path, workers=1)

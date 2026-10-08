@@ -62,17 +62,24 @@ def _scorer():
     return tnf_ph_score
 
 
-def score_poses(manifest: pd.DataFrame, pose_dir, workdir="_phwork", workers: int = 8, binder_chain="D", target_chains=("A", "B", "C")) -> pd.DataFrame:
-    """Run the K layer on every pose (PDB, chains A,B,C target + D binder). Raises if any pose fails; ~2 s per pose. NOT for a shared login node (use a CPU job)."""
-    from concurrent.futures import ProcessPoolExecutor
+def _score_one(args):
+    """Module-level so a process pool can pickle it (a function defined inside score_poses cannot be). Imports the scorer in the worker."""
+    r, pose_dir, workdir, binder_chain, target_chains = args
     ps = _scorer()
-    pose_dir = str(pose_dir)
+    row = ps.score_one(os.path.join(pose_dir, r["file"]), binder_chain, list(target_chains), None, os.path.join(workdir, r["file"].replace(".pdb", "")), True)
+    return dict(id=r["id"], parent=r["parent"], role=r["role"], seed=r["seed"], k_status=row.get("k_status"), n_iface=row.get("k_n_iface_ionisable"),
+                rel60=row.get("k_release_60v74"), rel55=row.get("k_release_55v74"))
 
-    def one(r):
-        row = ps.score_one(os.path.join(pose_dir, r["file"]), binder_chain, list(target_chains), None, os.path.join(workdir, r["file"].replace(".pdb", "")), True)
-        return dict(id=r["id"], parent=r["parent"], role=r["role"], seed=r["seed"], k_status=row.get("k_status"), n_iface=row.get("k_n_iface_ionisable"),
-                    rel60=row.get("k_release_60v74"), rel55=row.get("k_release_55v74"))
-    with ProcessPoolExecutor(workers) as ex: out = pd.DataFrame(list(ex.map(one, manifest.to_dict("records"))))
+
+def score_poses(manifest: pd.DataFrame, pose_dir, workdir="_phwork", workers: int = 8, binder_chain="D", target_chains=("A", "B", "C")) -> pd.DataFrame:
+    """Run the K layer on every pose (PDB, chains A,B,C target + D binder). Raises if any pose fails; ~2 s per pose. NOT for a shared login node (use a CPU job).
+    workers=1 runs inline (no process pool)."""
+    jobs = [(r, str(pose_dir), str(workdir), binder_chain, tuple(target_chains)) for r in manifest.to_dict("records")]
+    if workers <= 1:
+        out = pd.DataFrame([_score_one(j) for j in jobs])
+    else:
+        from concurrent.futures import ProcessPoolExecutor
+        with ProcessPoolExecutor(workers) as ex: out = pd.DataFrame(list(ex.map(_score_one, jobs)))
     bad = out[out.k_status != "ok"]
     if len(bad): raise RuntimeError(f"{len(bad)} poses failed to score (first: {bad.iloc[0].to_dict()})")
     return out
