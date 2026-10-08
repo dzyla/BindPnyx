@@ -1,5 +1,7 @@
 # Instructions for AI agents operating this repository
 
+> Starting a new round with several agents? Read `docs/CAMPAIGN_PLAYBOOK.md` first (roles, shared-file protocol, evidence standards, compute rules).
+
 You are running a computational binder-design workflow (PXDesign diffusion → ProteinMPNN → Protenix/Boltz-2 scoring) on one shared RTX 5090.
 Read `docs/RECOMMENDATIONS.md` for the why. This file is the playbook and the guardrails. It overrides convenience.
 
