@@ -84,7 +84,7 @@ def _done(root: Path, i: str) -> bool:
     return (root / i / f"confidence_{i}_model_0.json").exists() and (root / i / f"pae_{i}_model_0.npz").exists()
 
 
-def run_seed(df: pd.DataFrame, out: Path, seed: int, recycles=3, steps=200, gpu=None, species: str = "human") -> Path:
+def run_seed(df: pd.DataFrame, out: Path, seed: int, recycles=3, steps=200, gpu=None, species: str = "human", extra_args=()) -> Path:
     """One Boltz-2 batch at `seed`. Resumable on real outputs. Raises if any design lacks output afterwards."""
     od = out / f"seed{seed}"
     root = od / "boltz_results_yaml" / "predictions"
@@ -98,10 +98,12 @@ def run_seed(df: pd.DataFrame, out: Path, seed: int, recycles=3, steps=200, gpu=
             import os
             env = {**os.environ, "CUDA_VISIBLE_DEVICES": str(gpu)}
         t0 = time.time()
-        p = subprocess.run([boltz_bin(), "predict", str(ydir), "--out_dir", str(od), "--recycling_steps", str(recycles),
-                            "--sampling_steps", str(steps), "--diffusion_samples", "1", "--write_full_pae",
-                            "--accelerator", "gpu", "--override", "--no_kernels", "--seed", str(seed)],
-                           capture_output=True, text=True, env=env)
+        cmd = [boltz_bin(), "predict", str(ydir), "--out_dir", str(od), "--recycling_steps", str(recycles),
+               "--sampling_steps", str(steps), "--diffusion_samples", "1", "--write_full_pae",
+               "--accelerator", "gpu", "--override", "--no_kernels", "--seed", str(seed), *map(str, extra_args)]
+        # the exact command is part of the result: a flag such as --num_workers changes the prediction (reproducibly), so it must travel with the numbers
+        (od / "boltz.cmd").write_text(" ".join(cmd) + "\n")
+        p = subprocess.run(cmd, capture_output=True, text=True, env=env)
         (od / "boltz.log").write_text(p.stdout[-30000:] + "\n" + p.stderr[-30000:])
         print(f"seed {seed}: {len(missing)} designs, rc={p.returncode}, {time.time() - t0:.0f}s", flush=True)
     still = [i for i in df["id"] if not _done(root, i)]

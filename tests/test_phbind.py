@@ -160,3 +160,19 @@ def test_mouse_scoring_uses_the_mouse_sequence_and_msa_not_the_human_ones(tmp_pa
     assert T.TNF_MOUSE in y and T.TNF_HUMAN not in y and str(m) in y and str(h) not in y
     y = (B.write_yamls(df, tmp_path / "hu") / "d1.yaml").read_text()          # default stays human
     assert T.TNF_HUMAN in y and T.TNF_MOUSE not in y and str(h) in y
+
+
+def test_boltz_run_records_its_exact_command_and_passes_extra_flags(tmp_path, monkeypatch):
+    import subprocess, pandas as pd
+    from phbind import boltz_trimer as B, trimer as T
+    h, m = tmp_path / "h.a3m", tmp_path / "m.a3m"; h.write_text(">q\n" + T.TNF_HUMAN + "\n"); m.write_text(">q\n" + T.TNF_MOUSE + "\n")
+    monkeypatch.setattr(B, "_MANIFEST", {"files": {"msa_human": {"path": str(h)}, "msa_mouse": {"path": str(m)}}}); monkeypatch.setattr(B, "boltz_bin", lambda: "boltz")
+    seen = {}
+    def fake(cmd, **kw):
+        seen["cmd"] = cmd; return subprocess.CompletedProcess(cmd, 0, "", "")
+    monkeypatch.setattr(subprocess, "run", fake)
+    df = pd.DataFrame({"id": ["d1"], "seq": ["ACDEFGHIKLMNPQRSTVWY" * 3]})
+    with pytest.raises(RuntimeError):                       # the fake writes no predictions, so the counted-artifact guard must fire AFTER the command ran
+        B.run_seed(df, tmp_path / "o", 101, extra_args=("--num_workers", "0"))
+    assert seen["cmd"][-2:] == ["--num_workers", "0"] and "--no_kernels" in seen["cmd"]
+    assert (tmp_path / "o" / "seed101" / "boltz.cmd").read_text().split() == [str(c) for c in seen["cmd"]]
