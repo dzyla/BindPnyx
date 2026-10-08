@@ -129,3 +129,14 @@ def test_a_thin_novelty_margin_ranks_below_a_clean_one_in_the_same_tier(rk):
     ev("clean", **base, novelty_hits_qtm=0, novelty_best_qtm=0.65)
     ev("thin", **{**base, "boltz_h_mean": 0.9, "af3_h": 0.8}, novelty_hits_qtm=0, novelty_best_qtm=0.79)           # better scores, margin 0.01 under the 0.80 line
     df = R.rank().set_index("design_id"); assert df.loc["thin", "tier"] == df.loc["clean", "tier"] == "A" and df.loc["clean", "rank"] < df.loc["thin", "rank"]
+
+
+def test_ph_worst_pose_is_displayed_but_changes_no_tier_and_no_order(rk):
+    reg("a", 0, lineage="L1"); reg("b", 1, lineage="L2")
+    base = dict(boltz_h_mean=0.8, boltz_h_worst=0.7, boltz_h_n=5, af3_h=0.7, novelty_hits_qtm=0, novelty_best_qtm=0.6, ph_delta=1.0, ph_se=0.1, ph_npose=5)
+    ev("a", **base); ev("b", **base)
+    before = R.rank().set_index("design_id")
+    ev("a", ph_worst_pose=-0.30)                  # a pose that binds harder at acid pH
+    after = R.rank().set_index("design_id")
+    assert "ph_worst" in after.columns and abs(after.loc["a", "ph_worst"] + 0.30) < 1e-9 and after.loc["b", "ph_worst"] != after.loc["b", "ph_worst"]
+    assert (before[["tier", "ph", "row_order"]] == after[["tier", "ph", "row_order"]]).all().all()      # display only: no tier, pH label or order moved

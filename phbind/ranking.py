@@ -28,6 +28,7 @@ METRICS = {   # name -> meaning
     "novelty_hits_qtm": "PDB hits with qtmscore >= 0.80 at >= 70% query coverage", "novelty_best_qtm": "best qtmscore at >= 70% coverage",
     "novelty_hits_alntm": "same count under alntmscore (adverse convention)", "novelty_best_alntm": "best alntmscore at >= 70% coverage",
     "ph_delta": "multi-pose PROPKA k_release(variant) - k_release(parent), kcal/mol, pH 6.0 vs 7.4", "ph_se": "standard error of ph_delta", "ph_npose": "number of poses behind ph_delta",
+    "ph_worst_pose": "DISPLAY ONLY (no rule uses it yet): lowest ABSOLUTE release over the poses, kcal/mol; a value <= 0 means a pose binds as hard or harder at acid pH",
 }
 DEFAULT_RULES = {
     "boltz_robust": {"mean": 0.65, "worst": 0.50, "min_n": 3}, "boltz_pass": 0.50, "af3_pass": 0.50, "af3_near": 0.45,
@@ -73,7 +74,7 @@ def classify(v: pd.Series, nn: pd.Series, r: dict) -> dict:
     mouse = "na" if mm is None else ("pass" if (mm >= mp["mean"] and (mw or 0) >= mp["worst"] and mn >= mp["min_n"] and (a3m is None or a3m >= mp["af3_min"])) else "fail")
     hq, bq, ha = g("novelty_hits_qtm"), g("novelty_best_qtm"), g("novelty_hits_alntm")
     nov = "unscreened" if hq is None else ("fail" if hq > 0 else ("thin" if ((bq or 0) >= r["novelty_thin_qtm"] or (ha or 0) > 0) else "clean"))
-    pd_, se, npz = g("ph_delta"), g("ph_se"), g("ph_npose"); pr = r["ph_supported"]
+    pd_, se, npz = g("ph_delta"), g("ph_se"), g("ph_npose"); pw = g("ph_worst_pose"); pr = r["ph_supported"]
     ph = "none" if pd_ is None or pd_ < pr["delta"] else ("supported" if ((npz or 0) >= pr["min_pose"] and se is not None and pd_ - pr["z"] * se > 0) else ("single-pose" if (npz or 0) < pr["min_pose"] else "unconfirmed"))
     ok_b = boltz in ("robust", "pass")
     if nov == "fail": tier = "X"                                                    # structurally known: unsubmittable whatever the oracles say
@@ -83,7 +84,7 @@ def classify(v: pd.Series, nn: pd.Series, r: dict) -> dict:
     elif ok_b or mouse == "pass": tier = "C"                                        # includes: one model passes, the other rejects (disagreement)
     else: tier = "D"
     merit = (hm + a3h) / 2 if (hm is not None and a3h is not None) else ((hm or 0) * 0.85 if hm is not None else 0.0)
-    return dict(tier=tier, boltz_h=boltz, af3_h=af3, mouse=mouse, novelty=nov, ph=ph, merit=round(merit, 3), robust=int(boltz == "robust"))
+    return dict(tier=tier, boltz_h=boltz, af3_h=af3, mouse=mouse, novelty=nov, ph=ph, ph_worst=(float("nan") if pw is None else float(pw)), merit=round(merit, 3), robust=int(boltz == "robust"))
 
 def row_order(ranked: pd.DataFrame, r: dict) -> list[str]:
     """Submission ORDER (the first N are screened in the order submitted). Tiers are never reordered: inside the best remaining tier pick the best design whose lineage is under its share of
@@ -117,7 +118,7 @@ def write(df: pd.DataFrame, top: int | None = None):
          "Tiers: **A** Boltz-2 >= 0.5 AND AlphaFold3 >= 0.5 on human (the two-model consensus; extra Boltz seeds add robustness, not eligibility) with a clean/thin novelty result; **B** passes on one model with the other near/missing (or novelty unscreened), or is a novelty-clean mouse binder; "
          "**C** the models disagree (one passes, the other rejects); **D** below; **X** excluded (novelty fail). Within a tier: pH evidence, then mouse, then a CLEAN novelty margin before a thin one, then 5-seed robustness, then mean of the two oracles. `row_order` is the suggested submission order (lineage-capped, no adjacent repeats).", "",
          f"## Suggested submission order (first {n} are screened, in this order)", "", "| row | design | lineage | tier | merit | boltz h | af3 h | mouse | novelty | pH | missing |", "|---|---|---|---|---|---|---|---|---|---|---|"]
-    for x in ordr.head(n).itertuples(): L.append(f"| {int(x.row_order)} | {x.design_id} | {x.lineage} | {x.tier} | {x.merit} | {x.boltz_h} | {x.af3_h} | {x.mouse} | {x.novelty} | {x.ph} | {x.missing or '-'} |")
+    for x in ordr.head(n).itertuples(): L.append(f"| {int(x.row_order)} | {x.design_id} | {x.lineage} | {x.tier} | {x.merit} | {x.boltz_h} | {x.af3_h} | {x.mouse} | {x.novelty} | {x.ph}{'' if x.ph_worst != x.ph_worst else f' (min pose {x.ph_worst:+.2f})'} | {x.missing or '-'} |")
     ex = df[df.tier == "X"]; L += ["", f"## Counts", "", df.tier.value_counts().sort_index().to_string(), "", f"## Excluded (novelty fail): {', '.join(ex.design_id) if len(ex) else 'none'}",
                                   "", f"## Not yet orderable (sequence needed): {', '.join(df[df.contract != 'ok'].design_id) or 'none'}"]
     (DIR / "FINAL_RANKING.md").write_text("\n".join(L) + "\n")
