@@ -1,4 +1,4 @@
-"""S0: build and verify the TNF-alpha target contract (PHBIND_HANDOFF.md section 2/4).
+"""S0: build and verify the TNF-alpha target contract (the project's target contract).
 
 Every guard raises; nothing warns. Output: phbind/target/target_manifest.json plus copies of the
 organiser PDBs, dimers and NUL-fixed MSAs. Nothing downstream may read a target file directly.

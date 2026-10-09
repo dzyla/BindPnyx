@@ -15,7 +15,7 @@
 export RANKING_DIR=<shared ranking dir> ; R="python $RANKING_DIR/rank.py"
 $R check                                              # validate ledger + registry (alphabet, no Cys, 60-250 aa, duplicate sequences, unknown metrics)
 $R add-design <id> --sequence <SEQ> --lineage <backbone/lineage> --generator <BindCraft2|PXDesign|...> [--parent P] [--note T]
-$R add <design_id> <metric> <value> --agent <your session> [--n <seeds>] [--note "NOTE 38, 5-seed human"]
+$R add <design_id> <metric> <value> --agent <your session> [--n <seeds>] [--note "5-seed human"]
 $R rank                                               # rewrite FINAL_RANKING.md/.csv and print the submission order
 ```
 Metrics (`rank.py` lists them): `boltz_h_mean|worst`, `boltz_m_mean|worst` (grouped ipSAE, MIN direction; put the number of seeds in `--n` on the MEAN row), `af3_h`, `af3_m` (**ipSAE, not ipTM**),

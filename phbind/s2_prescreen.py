@@ -63,8 +63,8 @@ def main(src=REPO / "out/phbind/designs_all.csv"):
 if __name__ == "__main__": main()
 
 
-SCREEN_CUT = _P["cut"]   # 1-seed grouped ipSAE(min) cut taking designs to the 5-seed gate. Lowered 0.45 -> 0.35 after SHARED_BRIEFING 9.6: with 7 sibling positives the recall CI is [0.59, 1.0],
-                    # and every PXDesign backbone is a new lineage (the cut is an economy only inside a lineage already understood). SHARED_BRIEFING 1.2: 7/7 sibling seed-unanimous designs >= 0.69 at one seed,
+SCREEN_CUT = _P["cut"]   # 1-seed grouped ipSAE(min) cut taking designs to the 5-seed gate. Lowered 0.45 -> 0.35 after an internal review: with 7 sibling positives the recall CI is [0.59, 1.0],
+                    # and every PXDesign backbone is a new lineage (the cut is an economy only inside a lineage already understood). the same review: 7/7 sibling seed-unanimous designs >= 0.69 at one seed,
                     # cut 0.45 kept 7/7 and dropped 46%; reproduced here on the 20 known designs (5/5 gate-passers >= 0.63 at each of 3 seeds, n=5, wide interval).
 def shortlist(cut=SCREEN_CUT):
     a = pd.concat([pd.read_csv(f) for f in sorted(OUT.glob("batch_*.csv"))], ignore_index=True)

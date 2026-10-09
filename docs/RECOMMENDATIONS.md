@@ -183,7 +183,7 @@ Facts verified in the installed code (not yet exercised on cyclic data):
 - **This repo's AF2 evaluator** already has an `is_cyclic` option and `add_cyclic_offset` (`pxdbench/tools/af2/`): usable as an independent second judge (different model family from Boltz).
 - **Protenix** shows no cyclic-chain option (only a `cyclic-pseudo-peptide` ligand type). The Protenix-0.5-mini fast screen and Protenix-v2 judge would model a linear chain, so they are not valid for head-to-tail cyclic peptides.
 - **PXDesign diffusion** is not cyclic-aware and is built for 50-150 aa proteins; it is the wrong generator for 8-20 aa cyclic peptides.
-- **BoltzGen** (MIT; weights are already cached on this machine) has a `peptide-anything` protocol with disulfide-bond constraints (`bond: atom1 [S, i, SG] ... atom2 [S, j, SG]`) and per-residue `binding_types` for the target. I could not confirm head-to-tail
+- **BoltzGen** (MIT; weights are downloaded on first use) has a `peptide-anything` protocol with disulfide-bond constraints (`bond: atom1 [S, i, SG] ... atom2 [S, j, SG]`) and per-residue `binding_types` for the target. I could not confirm head-to-tail
   cyclization support from its README; check the docs before relying on it. ColabDesign-style AF2 hallucination with a cyclic offset (as in BindCraft's cyclic option) is the established alternative.
 
 Proposed adaptation of the funnel (not built):
@@ -218,7 +218,6 @@ Consequences: (1) judging a docked pose with a co-folding model measures *recogn
 `python scripts/export_public.py --dest ../bindpnyx-public --run-tests` copies an allowlist (no structures, MSAs, run outputs, per-design benchmark tables, private manifests or git history),
 sanitizes machine paths, runs `scripts/check_public.py` (personal paths/handles, emails, credentials, data files, large files, symlinks) and the test suite inside the clean tree
 (616 passed, 64 skipped, 0 failed at the time of writing). It does `git init` but no commit and no remote. Targets are rebuilt from public PDB ids by `funnel/fetch_target.py`.
-Items for the owner to decide before publishing: the licence (AGPL-3.0, `COMMERCIAL.md`), the project name, and whether the benchmark figures in `docs/` may be shown.
 
 ## 19. Second judge: OpenFold3 instead of Protenix-v2 (implemented 2026-10-05; measured elsewhere, not wet-lab validated by us)
 
@@ -232,7 +231,7 @@ Why: on the `Anthropic/claude-protein-binder-design` v1.0 release (1,320 designs
 | RoseTTAFold3 | +0.053 | [-0.013, +0.120] |
 | ESMFold2 (full) | +0.040 | [-0.033, +0.107] |
 
-Only OpenFold3 clears zero; the funnel's current pair scored 0.467 (worst of the pairs tried) and Boltz-2 + OpenFold3 0.560. **These numbers come from an external analysis. They could not be re-derived here: the release's wet-lab labels are not on this machine** (the score/PAE bundle is). Treat them as a prior, and recheck on your own lab results.
+Only OpenFold3 clears zero; the funnel's current pair scored 0.467 (worst of the pairs tried) and Boltz-2 + OpenFold3 0.560. **These numbers come from an external analysis. They could not be re-derived here: the release's wet-lab labels are not included in this repository** (neither is the score/PAE bundle). Treat them as a prior, and recheck on your own lab results.
 
 Rules that came with it:
 - **Two oracles, not three:** 2 vs Boltz-2 alone +0.100 [+0.027, +0.187]; a third +0.000 [-0.020, +0.020].

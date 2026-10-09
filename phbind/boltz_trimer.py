@@ -1,6 +1,6 @@
 """Boltz-2 co-folding of binder + the INTACT human TNF-alpha trimer, and the scoring of what comes out.
 
-Contract (PHBIND_HANDOFF sections 4-5): 3 target chains (471 residues, `_nulfix` MSA on every copy), binder
+Contract (the project's scoring contract): 3 target chains (471 residues, `_nulfix` MSA on every copy), binder
 single-sequence with no MSA and no templates, one batch per seed, ipSAE grouped (3 chains = one group) with
 the max convention reported beside min. Every failure raises; nothing is gated on an exit status.
 
@@ -187,7 +187,7 @@ def run(df: pd.DataFrame, out: Path, seeds, species: str = "human", **kw) -> pd.
 def summarise(res: pd.DataFrame) -> pd.DataFrame:
     """Per design over seeds. THE GATE IS CALIBRATED ON THE MIN-DIRECTION GROUPED ipSAE, not on max.
 
-    PHBIND_HANDOFF section 5 says to use `max`, but its gate (unanimous AND mean >= 0.65 AND worst >= 0.50) comes from the
+    the project's scoring contract says to use `max`, but its gate (unanimous AND mean >= 0.65 AND worst >= 0.50) comes from the
     sibling campaign's 5-seed table, and re-scoring those 20 designs here (accept_regression.py, 3 seeds, 1 batch) reproduces
     that table with `min` (Spearman 0.93, median |d| 0.032, 5/20 pass == sibling's 5/20) and NOT with `max`
     (bias +0.20, 14/20 pass). Applying 0.65/0.50 to max would admit designs the sibling rejected. So: gate on min, report max.

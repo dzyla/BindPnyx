@@ -16,3 +16,6 @@ out/
 
 # homo-oligomer campaign data (generated targets, run outputs) is never committed
 phbind/target/
+
+# private deny-list for scripts/check_public.py (never commit)
+scripts/.private_terms

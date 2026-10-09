@@ -8,22 +8,33 @@ from pathlib import Path
 
 TEXT_BAD = [
     (r"/home/(?!someone\b|user\b|you\b|runner\b|alice\b|out/|my_pdbs/)[A-Za-z0-9_.-]+", "personal home path"),
-    (r"/mnt/(?:HDD\d|nas|scratch|nas-home)\b", "machine-specific mount path"),
-    (r"dzyla(?!/fastPISA|/binder-design|/BindPnyx)", "personal handle (only github.com/dzyla/fastPISA, /BindPnyx and the old /binder-design are allowed)"),
-    (r"cuanschutz|\bdawid\b|\bzyla\b", "personal / institutional name"),
+    (r"/mnt/[A-Za-z0-9_.-]+/", "machine-specific mount path"),
     (r"[A-Za-z0-9._%+-]+@(?!example\.|users\.noreply)[A-Za-z0-9.-]+\.(?:edu|com|org|net|io)\b", "email address"),
-    (r"mev_screen|HDD1|egfr_px_obj|dzyla-lab", "internal project / host name"),
     (r"ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{32,}|BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY", "credential"),
 ]
+
+def _private_terms():
+    """Personal names, institution and host names, internal file and session names are NOT listed in this file (a deny-list in a public repository publishes what it forbids).
+    They are read, one `regex<TAB>reason` per line (case-insensitive), from the file named by $PUBLIC_CHECK_TERMS or from scripts/.private_terms; neither is committed."""
+    import os
+    f = Path(os.environ.get("PUBLIC_CHECK_TERMS") or Path(__file__).resolve().parent / ".private_terms")
+    if not f.exists(): return None
+    out = []
+    for line in f.read_text().splitlines():
+        if not line.strip() or line.lstrip().startswith("#"): continue
+        pat, _, why = line.partition("\t"); out.append((pat.strip(), why.strip() or "private term"))
+    return out
+
 BAD_EXT = {".pdb", ".cif", ".ent", ".mmcif", ".a3m", ".npz", ".npy", ".pt", ".ckpt", ".mrc", ".h5", ".parquet", ".gz", ".zip", ".tar", ".safetensors"}
 ALLOW_BIN = ("tests/fixtures/", "colabdesign/af/weights/", "colabdesign/mpnn/weights/", "colabdesign/mpnn/weights_soluble/", "docs/figures/", "bench/results/figures/")
 MAX_BYTES = 2_000_000
 
 def scan(root):
-    root = Path(root); bad = []
+    root = Path(root); bad = []; private = _private_terms()
+    if private is None: print("note: no private-terms file ($PUBLIC_CHECK_TERMS or scripts/.private_terms): only the generic rules ran", file=sys.stderr)
     for p in sorted(root.rglob("*")):
         rel = p.relative_to(root).as_posix()
-        if ".git/" in rel + "/" or rel == ".git" or p.is_dir() or rel == "scripts/check_public.py": continue
+        if ".git/" in rel + "/" or rel == ".git" or p.is_dir() or rel in ("scripts/check_public.py", "scripts/.private_terms"): continue
         if p.is_symlink(): bad.append((rel, 0, "symlink (points outside the repository?)")); continue
         allow = rel.startswith(ALLOW_BIN)
         if p.suffix.lower() in BAD_EXT and not allow: bad.append((rel, 0, f"data/structure file type {p.suffix}"))
@@ -33,7 +44,9 @@ def scan(root):
         except Exception: continue
         for n, line in enumerate(txt.splitlines(), 1):
             for pat, why in TEXT_BAD:
-                if re.search(pat, line, re.I if "dawid" in pat else 0): bad.append((rel, n, f"{why}: {line.strip()[:110]}"))
+                if re.search(pat, line): bad.append((rel, n, f"{why}: {line.strip()[:110]}"))
+            for pat, why in (private or []):
+                if re.search(pat, line, re.I): bad.append((rel, n, f"{why} (private-terms rule)"))
     return bad
 
 if __name__ == "__main__":

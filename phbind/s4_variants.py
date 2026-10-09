@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent)); import trimer as T
 MAXASA = {"ALA": 129, "ARG": 274, "ASN": 195, "ASP": 193, "CYS": 167, "GLN": 225, "GLU": 223, "GLY": 104, "HIS": 224, "ILE": 197, "LEU": 201, "LYS": 236,
           "MET": 224, "PHE": 240, "PRO": 159, "SER": 155, "THR": 172, "TRP": 285, "TYR": 263, "VAL": 174}
 CATION_SITES = {6, 31, 32, 65, 82, 90, 112, 138}; CARBOXYLATE = {23: "GLU", 127: "GLU", 135: "GLU", 146: "GLU", 143: "ASP"}
-M3_CB_MAX = 8.0   # SHARED_BRIEFING s3.4: spec His-His distance is 8.0 A CB-CB; 6.5 A gave 16 pairs where 8.0 A gives 31
+M3_CB_MAX = 8.0   # internal note: spec His-His distance is 8.0 A CB-CB; 6.5 A gave 16 pairs where 8.0 A gives 31
 CARB_O = {"GLU": ("OE1", "OE2"), "ASP": ("OD1", "OD2")}
 
 def enumerate_sites(cif, binder_seq):
@@ -73,7 +73,7 @@ CARBOXYL = {"GLU": ("OE1", "OE2"), "ASP": ("OD1", "OD2")}
 def ap1_census(cif, binder_seq, his_positions, cutoff=3.5):
     """AP1 (His donating to a carboxylate = the Challenge-1 direction, inverted) re-checked on the REFOLDED variant, against
     carboxylates of the target AND of the binder: refolding moves a His next to a different carboxylate than the parent's geometry
-    predicted (SHARED_BRIEFING s3.3: 5 variants passed a parent-geometry veto and failed this). Returns {pos: [(chain, resnum, resname)]}."""
+    predicted (an internal check: 5 variants passed a parent-geometry veto and failed this). Returns {pos: [(chain, resnum, resname)]}."""
     s = MMCIFParser(QUIET=True).get_structure("x", str(cif))[0]; tab = T.chain_table(str(cif))
     bid = [c["chain_id"] for c in tab if c["seq"] != T.TNF_HUMAN][0]; B = {r.id[1]: r for r in s[bid]}
     O = [(c.id, r.id[1], r.get_resname(), a.coord) for c in s for r in c if r.get_resname() in CARBOXYL for a in r if a.get_id() in CARBOXYL[r.get_resname()]]
