@@ -113,7 +113,7 @@ pxdbench/     vendored + patched PXDesign benchmark code: metrics, Boltz backend
 colabdesign/  vendored ColabDesign build whose ProteinMPNN accepts `weights=`
 scripts/      environment setup (+ extras), target preparation, the original campaign runner, export_public.py / check_public.py (clean release tree + scanner)
 bench/        ProteinBase benchmark + generation experiments (scores, AUROC tables, figures)
-docs/         REPORT, RECOMMENDATIONS, WORKFLOW, EXTENDING, OVERNIGHT_PLAN, pipeline-flow, ADAPTYV_DESIGN_FLOW (the competition flow, no sequences), AGENT_FORUM (multi-agent coordination), CAMPAIGN_PLAYBOOK
+docs/         REPORT, RECOMMENDATIONS, WORKFLOW, EXTENDING, OVERNIGHT_PLAN, pipeline-flow, ADAPTYV_DESIGN_FLOW (the competition flow, no sequences), ADAPTYV_STATS (counts for both challenges), AGENT_FORUM (multi-agent coordination), CAMPAIGN_PLAYBOOK
 tests/        CPU only, no GPU needed:   PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q   (682 pass, 21 skipped in the full env; in a bare pandas/numpy/scipy env the tests that need torch, protenix, jax, biotite or matplotlib are skipped, not errors)
 .archive/     (git-ignored) earlier experiments and documents; nothing was deleted
 ```

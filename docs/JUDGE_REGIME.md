@@ -70,5 +70,5 @@ arms with a model that neither used (agreement with an independent predictor is 
 ## What is not established
 
 * No wet-lab data exist for designs chosen under `new`; every number above is an in-silico benchmark against previous wet-lab labels.
-* AlphaFold3 (real weights) has not been calibrated on the release; the default gate of 0.5 is a placeholder until it has been checked on labelled designs.
+* AlphaFold3 (real weights) has not been calibrated on the release; the default gate of 0.5 is a prior taken from Boltz-2 calibration, not checked on labelled designs.
 * The mean-over-min result is an exploratory comparison on one benchmark, not a pre-registered one.

@@ -1,7 +1,7 @@
 # Running the design pipeline successfully: recommendations
 
 Status: written 2026-10-04 from the evidence in `docs/REPORT.md` (scorer benchmark, generation experiments) and the funnel evaluation
-(`funnel/`). Items marked **[pending]** wait on runs still in progress (FimA, the MPNN-bias experiment) and will be revised.
+(`funnel/`). Items marked **[not evaluated]** were never completed (FimA, the MPNN-bias experiment); no result exists and none is claimed.
 For agents (AI assistants) operating the tools, see `AGENTS.md`.
 
 ## 1. The workflow to use
@@ -64,7 +64,7 @@ Judged identically (Boltz-2, 3 fresh seeds + Protenix-v2; consensus pass = Boltz
 |---|---|---|---|---|
 | MDM2 | 5 / 8 | 20 / 20 | 20 / 20 (0.7 GPU-h) | 20 / 20 (1.1 h) |
 | PD-L1 | 2 / 8 | 16 / 20 | **20 / 20 (1.2 h)** | 20 / 20 (1.8 h) |
-| FimA | **[pending]** | **[pending]** | **[pending]** | **[pending]** |
+| FimA | **[not evaluated]** | **[not evaluated]** | **[not evaluated]** | **[not evaluated]** |
 
 - MDM2 saturates, so it cannot rank large-N strategies. PD-L1 does: the funnel's *worst* design on Protenix-v2 is 0.72–0.74 versus 0.17 for the scaled baseline.
 - Cycling adds ~0.02 to median ipSAE for ~45–50% more GPU time and equal pass counts: **optional**, not default. Always judge cycled designs with models that were not in the loop.
@@ -85,8 +85,8 @@ Short answer: **yes, but by biasing the interface, not by reverting the weights.
 - Reverting to `original` changes hydrophobics by ~4 points and aromatics not at all. Earlier tests also showed the weights do not change the Boltz-2 score tail.
 - Real PD-L1 binders (ProteinBase) have 6.6% aromatics and PISA-measured 3.5 aromatic residues at the interface; the funnel's shortlists have ~1.
 - `funnel/run_funnel.py --mpnn-bias iface` adds +1.0 (F,W,Y), +0.5 (L,I,M,V), −0.5 (K,E,D,N,Q) logits **only on binder residues within 10 Å of the target**.
-- **[pending]** whether these sequences fold and score as well or better: `funnel/run_bias_experiment.sh` (PD-L1 and MDM2, judged head-to-head against the default-MPNN
-  funnel) runs automatically after the main evaluation. Until it reports, treat the bias as a hypothesis; do not make it the default.
+- **[not evaluated]** whether these sequences fold and score as well or better: `funnel/run_bias_experiment.sh` (PD-L1 and MDM2, judged head-to-head against the default-MPNN
+  funnel) was written for this but its result was not recorded. Treat the bias as an untested hypothesis; do not make it the default.
 
 ## 7. Reading the outputs
 
@@ -101,7 +101,7 @@ Short answer: **yes, but by biasing the interface, not by reverting the weights.
 
 | weakness | mitigation |
 |---|---|
-| Designs are ~84% helical, 30–45% Lys+Glu, aromatic-poor | interface bias [pending]; inspect `pisa_n_aromatic_iface`; order diverse panel |
+| Designs are ~84% helical, 30–45% Lys+Glu, aromatic-poor | interface bias [not evaluated]; inspect `pisa_n_aromatic_iface`; order diverse panel |
 | Two predictors place the binder within 5 Å in only ~40% of cases | do not treat one predicted pose as the binding mode; consider ensembles/third predictor |
 | Gate `bz_gate_egfr_provisional_v1` is EGFR-derived | use the consensus judge; calibrate per target on labelled designs where available |
 | ProteinBase negatives are pre-filtered | benchmark AUROCs are pessimistic against junk, optimistic about nothing |
@@ -166,7 +166,7 @@ Recommendation: pilot Mosaic (Boltz-2 + Protenix + an aromatic/charge prior) on 
 Cause: `torch/include/ATen/core/List_inl.h:202` uses `typename decltype(impl_->list)::difference_type`, which GCC 15 rejects ([-Wtemplate-body]); `-fpermissive` does not help; `g++-13` is not installed.
 Fix (verified: builds in 26 s): override that one line via an include path ahead of torch's (torch's file untouched). `funnel/build_layernorm.py` builds it inside `.pxd/ln_build/`;
 `--install` copies the `.so` where `layer_norm.py` imports it first, removing the ~80 s failed compile from every Protenix start (≈15–20% of a funnel run);
-`--verify` (idle GPU) compares it against `torch.nn.functional.layer_norm`. **Not installed yet** (shared environment; awaiting go-ahead and an idle GPU).
+`--verify` (idle GPU) compares it against `torch.nn.functional.layer_norm`. **Not installed in the reference environment**; install it into a private environment and run `--verify` on an idle GPU first.
 
 ## 14. Preparing for lab feedback
 
@@ -200,7 +200,7 @@ Proposed adaptation of the funnel (not built):
 Every stage is split into units that are saved as they finish: generation chunks (`--chunk`, default 100 backbones), per-chunk design + fast screen, every cycling round (`cycle/state.json`),
 every Boltz/Protenix prediction. Re-running the same command continues from the last finished unit; raising `--n-backbones`, `--rounds` or `--final-m` extends the same run.
 Smoke-tested by killing a run mid-stage, resuming (only the unfinished chunk was redone), extending the backbone count (only the new chunk) and raising the rounds (continued after round 1).
-A changed start set (more backbones) restarts cycling and archives the old state (`cycle_old_*`). `--gpus` runs units in parallel (tested logically with two workers on one card; a real 4-GPU run is pending).
+A changed start set (more backbones) restarts cycling and archives the old state (`cycle_old_*`). `--gpus` runs units in parallel (tested logically with two workers on one card; a real 4-GPU run has not been done).
 
 ## 17. Dock a known scaffold, redesign the interface (experimental)
 
