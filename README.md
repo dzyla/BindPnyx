@@ -1,6 +1,6 @@
-# BinderFunnel (working name): a protein-binder design workflow built on PXDesign
+# BindPnyx: a novelty-first, two-model-quorum protein-binder design workflow built on PXDesign
 
-> **Working name.** Rename freely (search for `BinderFunnel`; `pyproject.toml` says `binderfunnel`).
+> **About the name.** The Pnyx is the hill in Athens where the citizen assembly met and voted. Here independent judges (two different co-folding models, repeated seeds, both species, a structural-novelty check) each get a vote on every binder, and every vote is written into an append-only ledger. The code keeps its original import names (`funnel/`, `phbind/`); the former working name was BinderFunnel.
 > **This is not PXDesign.** It reuses PXDesign's diffusion model and vendored code (Apache-2.0, ByteDance) as the backbone generator, and adds everything around it:
 > a staged funnel, an independent two-model judge, interface quality metrics, review packages and operating guidance. It is not affiliated with or endorsed by ByteDance.
 

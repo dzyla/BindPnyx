@@ -7,9 +7,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "binderfunnel"
+name = "bindpnyx"
 version = "0.1.0"
-description = "BinderFunnel (working name): resumable protein-binder design workflow built on PXDesign diffusion, ProteinMPNN, Protenix and Boltz-2"
+description = "BindPnyx: resumable, novelty-first protein-binder design workflow with an independent two-model quorum, built on PXDesign diffusion, SolubleMPNN, Boltz-2 and AlphaFold 3"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0-or-later" }

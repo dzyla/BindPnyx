@@ -8,7 +8,7 @@
 | `evidence.csv` | **append-only** ledger: `ts, agent, design_id, metric, value, n, note` | append with `add` (never rewrite). A correction is a NEW row |
 | `rules.json` | thresholds and tier parameters | change only after agreeing in a note in the shared briefing; one edit |
 | `FINAL_RANKING.md` / `.csv` | output: tiers, merit, flags, and the suggested submission ROW ORDER | nobody; regenerate with `rank` |
-| `rank.py` | the tool (copy of `phbind/ranking.py` in https://github.com/dzyla/binder-design) | - |
+| `rank.py` | the tool (copy of `phbind/ranking.py` in https://github.com/dzyla/BindPnyx) | - |
 
 ## Commands (any Python with pandas; set RANKING_DIR)
 ```bash

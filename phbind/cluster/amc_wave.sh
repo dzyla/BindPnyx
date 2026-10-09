@@ -1,7 +1,7 @@
 #!/bin/bash
 # usage: amc_wave.sh <tag>   (LSF job: one GPU; one checkout per tag)
 set -u; TAG=$1; ROOT=$HOME/phbind_amc; D=$ROOT/$TAG; mkdir -p $D $ROOT/export; cd $D
-[ -d binder-design ] || git clone -q https://github.com/dzyla/binder-design
+[ -d binder-design ] || git clone -q https://github.com/dzyla/BindPnyx binder-design
 cd binder-design
 echo "HOST $(hostname) GPU $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -1) JOB ${LSB_JOBID:-none}"
 PXP=$HOME/miniconda3/envs/pxdesign/bin/python

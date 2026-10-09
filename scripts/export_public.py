@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a clean, publishable copy of this repository from an ALLOWLIST (no history, no private data), scan it, and optionally run the tests inside it.
 
-  python scripts/export_public.py --dest ../binderfunnel-public [--run-tests]
+  python scripts/export_public.py --dest ../bindpnyx-public [--run-tests]
 
 Not exported: .archive/, out/, data/, .pxd/, checkpoints, structures, MSAs, run outputs, per-design benchmark tables, private target manifests, anything the scanner flags.
 The destination gets `git init` but NO commit and NO remote: review it, then commit with your own identity and push.  Nothing is uploaded by this script."""

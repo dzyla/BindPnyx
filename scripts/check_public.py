@@ -9,7 +9,7 @@ from pathlib import Path
 TEXT_BAD = [
     (r"/home/(?!someone\b|user\b|you\b|runner\b|alice\b|out/|my_pdbs/)[A-Za-z0-9_.-]+", "personal home path"),
     (r"/mnt/(?:HDD\d|nas|scratch|nas-home)\b", "machine-specific mount path"),
-    (r"dzyla(?!/fastPISA|/binder-design)", "personal handle (only github.com/dzyla/fastPISA and /binder-design are allowed)"),
+    (r"dzyla(?!/fastPISA|/binder-design|/BindPnyx)", "personal handle (only github.com/dzyla/fastPISA, /BindPnyx and the old /binder-design are allowed)"),
     (r"cuanschutz|\bdawid\b|\bzyla\b", "personal / institutional name"),
     (r"[A-Za-z0-9._%+-]+@(?!example\.|users\.noreply)[A-Za-z0-9.-]+\.(?:edu|com|org|net|io)\b", "email address"),
     (r"mev_screen|HDD1|egfr_px_obj|dzyla-lab", "internal project / host name"),

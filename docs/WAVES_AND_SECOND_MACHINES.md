@@ -17,7 +17,7 @@ Two waves in one checkout share `out/phbind` (batch numbering, `designs_all.csv`
 
 ## Prerequisites on the second machine (all via environment variables; nothing is hard-coded)
 ```bash
-git clone https://github.com/dzyla/binder-design && cd binder-design          # code only; no data in git
+git clone https://github.com/dzyla/BindPnyx && cd BindPnyx          # code only; no data in git
 export PYTHONPATH=$(pwd)
 export PXD_PYTHON=<python of the PXDesign env>   PXD_BOLTZ_BIN=<boltz executable>   PXD_CHECKPOINTS=<dir with pxdesign_v0.1.0.pt>
 export PXD_AF3_PYTHON=<af3 env python>  PXD_AF3_DIR=<dir with run_alphafold.py>  PXD_AF3_MODELS=<dir with af3.bin.zst>     # the gate's second model

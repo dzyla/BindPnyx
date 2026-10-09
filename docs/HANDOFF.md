@@ -4,7 +4,7 @@ For the next agent (or person) picking this up on a new workstation. Read `AGENT
 **nothing has been wet-lab validated** and the owner expects lab feedback soon.
 
 ## 0. Where things are
-- Public repo (pushed 2026-10-05, commit `f37d8f4`, AGPL-3.0): https://github.com/dzyla/binder-design , branch `main`. It is a **clean export** (no structures, MSAs, run outputs, private notes, original git history).
+- Public repo (pushed 2026-10-05, commit `f37d8f4`, AGPL-3.0): https://github.com/dzyla/BindPnyx (formerly binder-design) , branch `main`. It is a **clean export** (no structures, MSAs, run outputs, private notes, original git history).
 - The old workstation's working tree (the original development directory) holds data that is **not** in the repo and will be lost unless copied: `out/` (all run outputs, FimH/PD-L1/MDM2 final_design folders, judge/controls tables, calibration CSVs),
   `data/targets/` (rebuildable with `funnel/fetch_target.py`), `.pxd/` (environments, rebuildable), `.archive/` (old docs/scripts), `checkpoints/` (weights, not redistributable).
   If the owner wants the numbers behind `docs/OVERNIGHT_RESULTS.md` reproducible without re-running, copy `out/judge`, `out/controls`, `out/funnel/*/final_design` and `out/calib`.
@@ -13,7 +13,7 @@ For the next agent (or person) picking this up on a new workstation. Read `AGENT
 
 ## 1. Bring-up on the new machine (do this first)
 ```bash
-git clone https://github.com/dzyla/binder-design.git && cd binder-design
+git clone https://github.com/dzyla/BindPnyx.git && cd BindPnyx
 ./scripts/setup.sh && ./scripts/setup_extras.sh          # envs, fastPISA, LightDock (own venv), fused LayerNorm (needs nvcc)
 ./scripts/fetch_checkpoints.sh                            # prints where weights come from; place pxdesign_v0.1.0.pt, protenix-v2, protenix_mini_default_v0.5.0 (see AGENTS.md: names lie, compare sha1)
 PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q   # expect ~623 pass, ~68 skip (data-dependent), 0 fail
@@ -60,7 +60,7 @@ Decision to make from the result: does the dock consensus beat or complement the
 5. **Additional generators through `--designs-csv`:** hallucination (BoltzDesign1 / Mosaic / BindCraft), BoltzGen, RFdiffusion. The seam works (`dock_redesign.py` is the example); none beyond docking has been wired or compared. Compare under `funnel/judge.py` + `controls.py`.
 6. **Additional scores** (earlier discussion, none implemented): ESM-C/ESM3 pseudo-likelihood as a developability/plausibility term, global interface dG. Only add to ranking if they add information on the ProteinBase labels (`bench/`).
 7. **Lab-feedback calibration:** a script to ingest wet-lab results (design id, binding yes/no, KD) and recompute the gate AUROCs / thresholds against `bench/`'s AUROC tables. Gate currently: Boltz ipSAE >= 0.5, interface PAE <= 2 A, v2 ipSAE >= 0.5; against labels it separates binders only moderately (AUROC 0.67-0.75).
-8. **Housekeeping:** project name (`BinderFunnel` is a working name), licence confirmation (AGPL-3.0 chosen; `pxdbench/metrics/_common_scorer.py` was re-written independently to remove a licence problem - owner should confirm), CI (GitHub Actions running pytest + `check_public.py`), pin/verify dependency versions on the new GPUs, remove the ProteinBase CSV path assumption in `bench/` (download instructions in `bench/README.md`).
+8. **Housekeeping:** project name (the project is now named BindPnyx; `BinderFunnel` was the working name), licence confirmation (AGPL-3.0 chosen; `pxdbench/metrics/_common_scorer.py` was re-written independently to remove a licence problem - owner should confirm), CI (GitHub Actions running pytest + `check_public.py`), pin/verify dependency versions on the new GPUs, remove the ProteinBase CSV path assumption in `bench/` (download instructions in `bench/README.md`).
 
 ## 5. What needs testing (not yet tested or only weakly tested)
 - **Backbone-count curve:** is 500 optimal? run 100/250/500/1000 on 2 targets, report passes per GPU-hour. Same for `--final-m` (60 -> 40/100) and `--seqs`.

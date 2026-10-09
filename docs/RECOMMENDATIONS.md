@@ -215,7 +215,7 @@ Consequences: (1) judging a docked pose with a co-folding model measures *recogn
 
 ## 18. Publishing the code without private data
 
-`python scripts/export_public.py --dest ../binderfunnel-public --run-tests` copies an allowlist (no structures, MSAs, run outputs, per-design benchmark tables, private manifests or git history),
+`python scripts/export_public.py --dest ../bindpnyx-public --run-tests` copies an allowlist (no structures, MSAs, run outputs, per-design benchmark tables, private manifests or git history),
 sanitizes machine paths, runs `scripts/check_public.py` (personal paths/handles, emails, credentials, data files, large files, symlinks) and the test suite inside the clean tree
 (616 passed, 64 skipped, 0 failed at the time of writing). It does `git init` but no commit and no remote. Targets are rebuilt from public PDB ids by `funnel/fetch_target.py`.
 Items for the owner to decide before publishing: the licence (AGPL-3.0, `COMMERCIAL.md`), the project name, and whether the benchmark figures in `docs/` may be shown.
