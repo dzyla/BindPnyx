@@ -21,7 +21,10 @@ def pisa_metrics(cif, a="A", b="B", hotspot_idx=None):
     out = {k: float("nan") for k in KEYS}
     try:
         res = fastpisa.analyze(str(cif)); itf = res.interface_between(a, b)
-        row = res.to_dataframe().iloc[0]
+        df = res.to_dataframe(); m = df.interface_id == itf.interface_id     # the pair's OWN row: with >2 chains (or glycans) row 0 is another interface
+        if not m.any():                                      # never fall back to another pair's numbers
+            raise ValueError(f"interface {itf.interface_id} ({a}/{b}) absent from the {len(df)}-row summary")
+        row = df[m].iloc[0]
         for k in KEYS: out[k] = float(row.get(k, float("nan")))
         s1, s2 = itf.residues(side=1), itf.residues(side=2)
         if hotspot_idx:

@@ -99,3 +99,36 @@ def test_final_design_tier_reads_the_shared_second_oracle_column():
     base = dict(consensus_pass=True, b_ipsae=.75, b_paemin=.6, hotspot_frac=1.0, pisa_flags="")
     assert fdz.tier({**base, "v2_ipsae": .78}) == "A" and fdz.tier({**base, "v2_ipsae": .60}) == "B"
     assert fdz.O2_LABEL["of3"] == "OpenFold3"
+
+
+def _judge_main(monkeypatch, tmp_path, extra):
+    """Run funnel/judge.py main() against a faked consensus() that has the funnel's signature; returns (kwargs seen, arm_summary)."""
+    import judge as J
+    import run_funnel as rf
+    arm = tmp_path / "arm.csv"; pd.DataFrame(dict(seq=["AAAA", "CCCC"])).to_csv(arm, index=False)
+    seen = {}
+
+    def fake(t, cands, outdir, seeds, T, tag, gpus=None, oracle2="protenix-v2", o2_gate=0.5, rank_rule="min"):
+        seen.update(oracle2=oracle2, seeds=seeds)
+        return pd.DataFrame({"id": cands.id, "seq": cands.seq, "arms": cands.arms, "b_ipsae": [.80, .72], "b_paemin": [.5, .6], "b_gate": [True, True],
+                             "v2_ipsae": [.78, .61], "v2_pass": [True, True], "consensus_pass": [True, True], "consensus": [.78, .61],
+                             "hotspot_frac": [1.0, .8], "o2_name": oracle2})
+
+    monkeypatch.setattr(rf, "consensus", fake)
+    monkeypatch.setattr(common, "load_target", lambda n: dict(seq="ACDEF", hotspot_idx=[1]))
+    monkeypatch.setattr(common, "cluster_count", lambda s: len(s))
+    monkeypatch.setattr(sys, "argv", ["judge.py", "--target", "x", "--out", str(tmp_path / "o"), "--arm", f"a={arm}", *extra])
+    J.main()
+    return seen, pd.read_csv(tmp_path / "o" / "arm_summary.csv")
+
+
+def test_judge_can_use_a_second_oracle_other_than_protenix_and_says_which(tmp_path, monkeypatch):
+    """The independent judge was hard-wired to Protenix-v2 even when the run was selected with another oracle."""
+    seen, s = _judge_main(monkeypatch, tmp_path, ["--second-oracle", "of3"])
+    assert seen["oracle2"] == "of3" and s["o2_name"].iloc[0] == "of3"
+    assert s["v2_pass"].iloc[0] == 2                      # the shared column names are unchanged for downstream readers
+
+
+def test_judge_defaults_to_protenix_v2(tmp_path, monkeypatch):
+    seen, s = _judge_main(monkeypatch, tmp_path, [])
+    assert seen["oracle2"] == "protenix-v2" and s["o2_name"].iloc[0] == "protenix-v2"

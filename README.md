@@ -19,6 +19,14 @@ Many cheap backbones → one cheap screen → expensive models only on the survi
 5. **Triage** with fastPISA and an in-house shape-complementarity implementation (flags, not scores), de-duplicate, tier.
 6. **Review package** `final_design/` per run: best models (CIF/PDB), FASTA, tables, plots, PyMOL/ChimeraX scripts, a report with all statistics.
 
+**If you read one thing, read [docs/DESIGN_PATH.md](docs/DESIGN_PATH.md).** It is the operating
+knowledge from running real campaigns with this code, with the measurement attached to each rule:
+how to choose the oracle pair for a target class (and why inheriting it fails), why a low score is
+uninformative without carriers, the batch discipline that makes a number comparable, which lever
+actually moves hit rate (optimisation depth, not the generator), when structural novelty — not
+affinity — is the binding constraint, the negative results so you do not pay for them twice, and a
+trap catalogue where every entry cost someone real time.
+
 ## Results so far (computational only; nothing is wet-lab validated)
 
 Top-20 designs per strategy, judged identically with fresh seeds (Boltz-2 x3 + Protenix-v2). *Pass* = Boltz ipSAE >= 0.5 and interface PAE <= 2 A and v2 ipSAE >= 0.5. GPU = RTX 5090.
@@ -82,7 +90,8 @@ One GPU job at a time. Worked target definitions: `funnel/targets/{pdl1,mdm2,fim
 | **Funnel** (PXDesign diffusion + MPNN, fast screen, cycling, consensus) | `funnel/run_funnel.py --target T --out O` | default; results above |
 | **Dock a known scaffold, redesign only the interface** (LightDock, restrained to the hotspots) | `funnel/dock_redesign.py --target T --out O --scaffolds all` | experimental; early tests gave ipSAE ~ 0 (see docs/OVERNIGHT_PLAN.md) |
 | **Bring your own designs** (any generator) | `funnel/run_funnel.py ... --designs-csv designs.csv` | supported; see [docs/EXTENDING.md](docs/EXTENDING.md) |
-| Interface aromatic bias in MPNN | `--mpnn-bias iface:0.6` | optional; neutral to slightly positive, no controls yet |
+| Interface aromatic bias in MPNN | `--mpnn-bias iface:0.6` | **off by default and staying off**: measured head-to-head on two targets, no effect on score or on interface aromatic contacts (docs/RECOMMENDATIONS.md §6) |
+| **Refine an existing design, preserving its binding mode** (ArcRefine: structural carryover through Boltz-2, built on Mosaic) | external tool, see docs/RECOMMENDATIONS.md §20 | **mixed evidence:** large gains on one target (parents that started weak), net loss on a second (12 already-passing designs, 12/12 -> 5/12 still passing). Its own confidence does not say which; re-judge against the parent in one batch on a second oracle family and keep the parent unless the refined sequence wins |
 | **No site given:** surface screen / blind-docking consensus | `funnel/hotspots.py`, `funnel/dock_epitope.py` | shortlist generators (surface screen validated on 4 known sites; docking consensus experimental), see docs/HOTSPOTS.md |
 
 Validation tools: `funnel/judge.py` (identical-protocol comparison of arms), `funnel/controls.py` (decoy targets + sequence shuffles), `funnel/screen_calibration.py`, `bench/` (ProteinBase wet-lab benchmark).

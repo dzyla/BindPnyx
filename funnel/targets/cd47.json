@@ -1,0 +1,7 @@
+{
+  "name": "cd47",
+  "description": "Human CD47 IgV ectodomain (PDB 2JJS chain C, resolved 2-116; construct UniProt Q08722 19-136, PDB number = UniProt - 18): the SIRPalpha-binding face. Goal: a miniprotein that occupies the SIRPalpha site and so blocks the CD47-SIRPalpha 'don't eat me' signal, de-repressing macrophage phagocytosis of tumour cells. Epitope taken from contacts in 2JJS itself (CD47 chain C vs SIRPalpha chain A: 21 residues, 286 heavy-atom contacts at 4.5 A; the C-B pair is a crystal neighbour, 22 contacts, and was ignored). Hotspots are the two contact loops' best-contacting residues: T102/R103 (36/35 contacts) and L101 (32) on the 97-106 loop, plus Y37 (27, aromatic anchor) and E35 (14) on the 29-39 loop. Face is compact: 18.3 A max CA-CA span, 6.8 A radius of gyration. Independent cross-check: the epitope of the CD47-blocking antibody B6H12.2 (PDB 5TZU chain C vs Fab chains H+L, same contact criterion) shares 14 of 21 residues with the SIRPalpha epitope (Jaccard 0.54), and ALL FIVE hotspots below are contacted by both the natural receptor and the blocking antibody - so this face is the one two structurally independent blockers engage, not a convention. NOTE the crystal carries one engineered mutation, C33G in UniProt numbering (PDB G15), 34.1 A from the epitope centroid, so it is remote from this design problem; the shard therefore reproduces the crystallised sequence, not strict wild-type.",
+  "source": {"pdb_id": "2JJS", "chain": "C", "range": "1-130"},
+  "hotspots": ["E35", "Y37", "L101", "T102", "R103"],
+  "binder_length": 70
+}

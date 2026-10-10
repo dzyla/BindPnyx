@@ -72,7 +72,9 @@ Judged identically (Boltz-2, 3 fresh seeds + Protenix-v2; consensus pass = Boltz
 
 ## 6. ProteinMPNN: can we model more hydrophobics?
 
-Short answer: **yes, but by biasing the interface, not by reverting the weights.**
+Short answer: **you can change the sequences, but it buys nothing.** Interface bias does raise the aromatic content of *raw* MPNN
+output, and neither that nor reverting the weights changes the judged score, the interface aromatic contacts or the pass count
+(measured 2026-10-09, below). **The default stays `--mpnn-bias none`.**
 
 | PD-L1 funnel backbones, 160 sequences | Lys+Glu (all) | aromatic (interface) | hydrophobic (interface) |
 |---|---|---|---|
@@ -85,8 +87,22 @@ Short answer: **yes, but by biasing the interface, not by reverting the weights.
 - Reverting to `original` changes hydrophobics by ~4 points and aromatics not at all. Earlier tests also showed the weights do not change the Boltz-2 score tail.
 - Real PD-L1 binders (ProteinBase) have 6.6% aromatics and PISA-measured 3.5 aromatic residues at the interface; the funnel's shortlists have ~1.
 - `funnel/run_funnel.py --mpnn-bias iface` adds +1.0 (F,W,Y), +0.5 (L,I,M,V), −0.5 (K,E,D,N,Q) logits **only on binder residues within 10 Å of the target**.
-- **[not evaluated]** whether these sequences fold and score as well or better: `funnel/run_bias_experiment.sh` (PD-L1 and MDM2, judged head-to-head against the default-MPNN
-  funnel) was written for this but its result was not recorded. Treat the bias as an untested hypothesis; do not make it the default.
+- **Resolved (2026-10-09): the bias does not survive selection.** `iface:0.6` vs the default, matched runs (500 backbones, `--rounds 0`,
+  `final_m` 60, top 20, soluble weights), judged head-to-head in one batch (`out/judge_bias/{mdm2,pdl1}`, n = 20 per arm):
+
+  | target | b_ipSAE | second-judge ipSAE | interface aromatic contacts | SC | interface area Å² | consensus pass |
+  |---|---|---|---|---|---|---|
+  | MDM2 | 0.899 → 0.898 | 0.902 → 0.901 | 3.0 → 3.5 | 0.618 → 0.624 | 1108 → 1142 | 20/20 → 20/20 |
+  | PD-L1 | 0.748 → 0.755 | 0.761 → 0.769 | 1.0 → **1.0** | 0.578 → 0.579 | 930 → 914 | 20/20 → 19/20 |
+
+  Every difference is ≤ 0.009 in ipSAE and every Mann-Whitney p ≥ 0.19; the repository's own noise floor is 0.03, so these are
+  indistinguishable from zero. The *goal* of the bias — aromatic contacts at the interface — did not move on PD-L1 at all.
+  **Why:** the bias raises whole-sequence aromatics in raw MPNN output (PD-L1: 2.7% → 3.9%, `out/mpnn_bias.log`), but the shortlists of
+  both arms land on the same 3.5% — the default arm's rises 2.7% → 3.5% under selection while the biased arm's falls 3.9% → 3.5%.
+  The fast screen and consensus converge on the same composition whatever prior MPNN was given, so a sequence-stage prior cannot be
+  the lever. Flagged designs also went *up* (MDM2 2 → 4, PD-L1 4 → 7). What this does not show: n = 20 per arm, unpaired (different
+  designs), two targets, one bias scale; it cannot exclude an effect smaller than ~0.03 ipSAE, and it does not test a *stronger* bias
+  (which §10 already warns carries aggregation risk) or a hallucination/co-design generator (§12), which remains the open route.
 
 ## 7. Reading the outputs
 
@@ -94,6 +110,16 @@ Short answer: **yes, but by biasing the interface, not by reverting the weights.
   `hotspot_frac`, `pisa_*`, `pisa_flags`.
 - **fastPISA flags are triage, not ranking.** Flagged designs (thin interface < 630 Å², < 4 H-bonds, no aromatic contact, apolar fraction < 0.33) were less likely to be real
   binders among gate-passers (38% vs 65%, p = 0.01, small n). They add ≈ +0.01 AUROC beyond ipSAE: do not weight them into a score.
+- **Check the flags against your own target's native interface before you let them triage anything.** The thresholds come from a
+  mixed wet-lab set, and a natural, high-affinity interface can fail them. Measured on CD47/SIRPα (2JJS chains C/A, the real
+  complex): 922 Å², 53 interface residues, 17 H-bonds, **13 salt bridges**, apolar BSA fraction **0.24**, **1** interface aromatic.
+  That native interface trips both `apolar_fraction < 0.33` and the aromatic flag, so on CD47 those two flags penalise designs for
+  resembling the biology. Compute the native reference first (`funnel/pisa.py:pisa_metrics(pdb, a=target_chain, b=partner_chain)`
+  on a two-chain extract) and say which flags are informative for that target.
+- `pisa_metrics` takes the interface's **own** row (matched on `interface_id`). It used to read row 0 of the summary, which is the
+  requested pair only when the structure has exactly two chains — true for every funnel complex, so no funnel number was affected,
+  but on a 4-chain input it was wrong by 6.5× (2JJS C/A: 149 Å² reported vs 975 Å² actual). Relevant to `phbind/` and to any
+  reference measurement on a crystal structure; a pair with no interface now returns NaN + `error` rather than another pair's numbers.
 - Shape complementarity and interface pLDDT were the strongest single extras in ProteinBase but are target-dependent / not yet implemented here.
 - Never compare `bz_*` scores across runs or batches; compare only within one judge run.
 
@@ -101,7 +127,7 @@ Short answer: **yes, but by biasing the interface, not by reverting the weights.
 
 | weakness | mitigation |
 |---|---|
-| Designs are ~84% helical, 30–45% Lys+Glu, aromatic-poor | interface bias [not evaluated]; inspect `pisa_n_aromatic_iface`; order diverse panel |
+| Designs are ~84% helical, 30–45% Lys+Glu, aromatic-poor | **not fixable at the sequence stage** (§6: interface bias measured, no effect — selection erases it); inspect `pisa_n_aromatic_iface`; order a diverse panel; the open route is a co-design generator (§12) |
 | Two predictors place the binder within 5 Å in only ~40% of cases | do not treat one predicted pose as the binding mode; consider ensembles/third predictor |
 | Gate `bz_gate_egfr_provisional_v1` is EGFR-derived | use the consensus judge; calibrate per target on labelled designs where available |
 | ProteinBase negatives are pre-filtered | benchmark AUROCs are pessimistic against junk, optimistic about nothing |
@@ -238,7 +264,89 @@ Rules that came with it:
 - **Freeze the pair.** Choosing the oracle combination per target scored 0.480 vs 0.553 for a fixed pair (-0.073 [-0.153, -0.007]).
 - **Do not fit a scorer** on seed instability, length, cycling rounds or provenance: every added feature lowered held-out precision@10 (plain consensus 0.587, everything 0.467).
 - **Seeds:** aggregation (mean/median/min/max) is worth 0.003; the second oracle +0.100. The funnel still spends 3 Boltz-2 seeds; moving to 1 Boltz-2 + 1 OpenFold3 at equal cost is *not* implemented, because the gate's `b_ipsae >= 0.5 & b_paemin <= 2` was calibrated on 3 seeds.
+- **Check the second oracle on a native binder of YOUR target before gating on it (measured on a hard single-chain target, 2026-10-10).**
+  Folding the real natural partner (a known nM-pM binder) and its composition-matched shuffle in the same batch: Boltz-2 0.526 / 0.105,
+  **Protenix-v2 0.742 / 0.000**, **OpenFold3 0.000 / 0.000**, AF3 0.33-0.39 / 0.000 (two GPU types, median replicate difference 0.002).
+  Across 83 designs OpenFold3 passed only 39% at >= 0.5 against 96% (Boltz-2) and 87% (Protenix-v2), with rank agreement of only 0.35-0.49.
+  So on this target OpenFold3 could not recognise the one binder known to be real, and the external +0.093 above did not transfer.
+  With n = 1 native positive (an Ig domain, unlike the helical designs) this cannot separate "strict" from "blind"; it is enough to
+  refuse to gate on it. Protenix-v2 stayed the gate partner; OpenFold3 and AF3 are reported columns. The general lesson is in
+  `docs/DESIGN_PATH.md` section 2: an oracle that scores a known binder 0 cannot rank designs, whatever a benchmark says.
 - **Directional ipSAE:** `*_ipsae_b2t` (binder->target) is reported for Boltz-2, Protenix and OpenFold3. Across oracles it ranked slightly better within target than the min (AUROC 0.718 vs 0.701), but the gate is calibrated on the min, so it is report-only.
+
+**`funnel/judge.py --second-oracle {protenix-v2,af3,of3}` (added 2026-10-10)** gives the independent judge the same choice the run was
+selected with; before, `judge.py` always used Protenix-v2 whatever oracle selected the designs. Columns keep the shared `v2_*` names and
+`arm_summary.csv` gains `o2_name`. Judging with an oracle that was not in the selection loop also removes the circularity AGENTS.md's
+"sanity" gate warns about. The gate's thresholds were calibrated on Boltz-2 + Protenix-v2, so carrying `>= 0.5` over to another model is a
+transfer, not a recalibration - report both oracles rather than only the one that gates.
 
 Setup: `.pxd/envs/openfold3` is a symlink to a conda env (python 3.12, torch cu128, `pip install -e <openfold-3 clone>[cuequivariance]`); weights in `~/.openfold3/of3-p2-155k.pt` (override with `PXD_OF3_CKPT`, binary with `PXD_OF3_BIN`). Run one GPU job at a time. OpenFold3 needs rectangular a3m files named like a database (`colabfold_main.a3m`); our target MSAs have ragged rows, which `common.a3m_rectangular` pads (a target MSA with fewer than 2 rows is refused). Measured speed: 6 designs in 52 s including model load.
 
+## 20. Improving designs you already have: ArcRefine (measured 2026-10 on two targets, n = 15 and n = 24)
+
+Once a pool has plateaued, the lever is refining specific candidates rather than generating more.
+Two routes exist here: MPNN cycling (§5, `--rounds`), and **ArcRefine**
+([github.com/ken-osumi/ArcRefine](https://github.com/ken-osumi/ArcRefine), FoldArc; built on Mosaic),
+which optimises a given binder sequence while carrying Boltz-2's single and pair representations
+between sequence updates, with the stated aim of preserving the fold and binding mode.
+Licence: **PolyForm Noncommercial 1.0.0** — academic/public-research use is permitted, commercial use
+needs the author's permission. Install it in its own environment (it bundles Mosaic modules and will
+collide with another Mosaic install).
+
+Input is a JSON with `parent_sequence` plus one entry per target chain; run `--validate-only` first,
+then `--output run`, which writes `optimized.fasta`/`result.json` (`optimized_sequence`) and separate
+parent/final predictions. **The CIF B-factors are placeholders: read the saved pLDDT arrays (0-1).**
+
+Measured over 15 completed runs (parents 65-200 aa, several generators, one target; each refinement
+re-judged against its own parent):
+
+| identity to parent | n | mean change in independent Boltz-2 ipSAE | kept after judging |
+|---|---|---|---|
+| 0.00-0.20 | 5 | **-0.646** | 0/5 |
+| 0.20-0.34 | 4 | -0.358 | 0/4 |
+| 0.34-1.00 | 6 | **+0.212** | 4/6 |
+
+Two rules follow, and both matter more than any setting:
+
+1. **ArcRefine's own ipTM does not tell you whether the refinement worked** (r = +0.08 with the
+   change in independent ipSAE, n = 14). It failed in both directions: one run's ipTM *fell*
+   0.813 -> 0.534 while independent Boltz-2 ipSAE *rose* 0.76 -> 0.88 (kept), and another's ipTM rose
+   0.844 -> 0.850 while ipSAE collapsed 0.77 -> 0.08 (discarded). Never gate on it.
+2. **Identity to the parent is the usable predictor** (r = +0.88). ArcRefine rewrites most of the
+   sequence - identity to parent ranged 0.07-0.43, so it is not a conservative tweak. Compute identity
+   first and drop anything below ~0.35 before spending oracle time. When it does retain the fold the
+   gains are large: best observed 0.56 -> 0.91 and 0.63 -> 0.92, with the orthologue moving the same way.
+
+**Judge the refined sequence and its parent in the SAME batch, on an oracle family that was not in
+ArcRefine's loop.** ArcRefine optimises against Boltz-2, so Boltz-2 alone is partly circular; carry
+AF3 or OpenFold3 alongside. Comparing a refined score against a parent score from an earlier batch is
+invalid (§4).
+
+**Replication on a second target did NOT confirm the identity rule, and ArcRefine hurt.** Twelve
+refinements of already-passing, cycled single-chain designs (parents 0.68-0.89 consensus), each
+re-judged against its own parent in one fresh-seed batch (Boltz-2 x3 + a second oracle):
+parents passing 12/12 -> refined passing **5/12**. In the >= 0.35-identity band (n = 10) the mean change
+in consensus was **-0.357** (the same band gained +0.212 on the first target), only 2 of 10 improved by
+more than 0.03 (best +0.129), and r(identity, change in consensus) was **+0.22** against +0.88 on the
+first target. The damage was oracle-specific: several refined sequences kept their Boltz-2 ipSAE
+(8 of 10 still >= 0.5) while the second oracle collapsed (0.860 vs 0.077 for one pair), and two did the
+reverse. That is what optimising through one model should produce, and it is why the second-family
+re-judge is not optional. Untested hypothesis: headroom - the first target's keepers started at
+0.56-0.63, these parents started at 0.68-0.89, so there was little to gain and much to lose.
+**Practical rule: treat ArcRefine as a lottery ticket per design, never as an upgrade.** Keep the parent,
+add the refined sequence only where it wins on the independent oracle in the same batch.
+
+What this does not show: n = 15 on the first target and n = 12 on the second, heterogeneous parents,
+and on the first target identity is confounded with length (every keeper was a 160-192 aa parent). The
+0.35 cut was a post-hoc split on 15 points and did not replicate - re-derive it per target or do not
+use it. Known input error: if `template_pdb` residues differ
+from the configured target sequence the run aborts; rerunning without the template succeeded.
+
+### Binder length: what was and was not shown
+On the same campaign, longer binders were **far more structurally novel** - Foldseek-vs-PDB clean rate
+rose from 21% at 62-112 aa to ~98% at 180-200 aa (TM >= 0.8 over >= 70% coverage counted as a hit), which
+is why generation moved to long binders there. That was a *novelty* result, driven by short helical
+bundles recapitulating known folds. A separate claim that length improved *binding scores* was made
+from one favourable batch and later **retracted**. So: use length to buy novelty when novelty is a
+requirement; do not expect it to raise ipSAE, and do not carry the novelty finding over to a target
+where nothing is filtering on novelty.

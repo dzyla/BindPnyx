@@ -98,6 +98,50 @@ def test_pisa_batch_reports_errors_instead_of_raising_on_a_bad_structure(tmp_pat
     assert out[0]["id"] == "x" and "error" in out[0]
 
 
+def _fake_fastpisa(monkeypatch, pair_to_id):
+    """Stand in for fastpisa. Mirrors the real API: interface_between() returns an object carrying its own
+    `interface_id`, and to_dataframe() lists EVERY interface in the structure, keyed by that id (one row per
+    interface, row order unrelated to the requested pair). `pair_to_id`: {(chain, chain): interface_id}."""
+    import sys, types
+    import pisa
+
+    class Itf:
+        def __init__(self, iid): self.interface_id = iid
+        def residues(self, side):
+            return [dict(seq=1, bsa=50.0, name="LEU")] if side == 1 else [dict(seq=1, bsa=40.0, name="PHE")]
+
+    class Res:
+        def interface_between(self, a, b):
+            iid = pair_to_id.get((a, b)) or pair_to_id.get((b, a))
+            if iid is None: raise KeyError(f"no interface {a}/{b}")
+            return Itf(iid)
+        def to_dataframe(self):
+            return pd.DataFrame([dict(interface_id=1, interface_area=100.0, n_interface_residues=5.0),
+                                 dict(interface_id=8, interface_area=900.0, n_interface_residues=50.0)])
+
+    fake = types.ModuleType("fastpisa"); fake.analyze = lambda p: Res()
+    monkeypatch.setitem(sys.modules, "fastpisa", fake)
+    return pisa
+
+
+PAIRS = {("A", "B"): 1, ("C", "A"): 8}
+
+
+@pytest.mark.parametrize("a,b,area", [("A", "B", 100.0), ("C", "A", 900.0), ("A", "C", 900.0)])
+def test_pisa_metrics_reads_the_requested_interfaces_own_row_not_the_first(monkeypatch, a, b, area):
+    """A structure with >2 chains (or glycans) has many interfaces and the requested pair is not row 0.
+    Measured on the real 4-chain 2JJS: row 0 is 149 A^2 while the requested CD47/SIRPalpha pair is 975 A^2."""
+    pisa = _fake_fastpisa(monkeypatch, PAIRS)
+    m = pisa.pisa_metrics("x.cif", a=a, b=b)
+    assert m["interface_area"] == area and "error" not in m
+
+
+def test_pisa_metrics_refuses_to_report_numbers_for_a_pair_that_has_no_interface(monkeypatch):
+    pisa = _fake_fastpisa(monkeypatch, PAIRS)
+    m = pisa.pisa_metrics("x.cif", a="A", b="Z")
+    assert m["interface_area"] != m["interface_area"] and "error" in m      # NaN, not another pair's value
+
+
 def test_add_pisa_never_blocks_a_run_when_the_metrics_are_unavailable(monkeypatch):
     import run_funnel, pisa
     monkeypatch.setattr(pisa, "batch", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
