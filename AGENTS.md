@@ -1,5 +1,7 @@
 # Instructions for AI agents operating this repository
 
+> Starting from a fresh clone or a new challenge? Read `docs/START_HERE.md` first (workspace linking, first-day checklist, tool map), then `docs/DESIGN_PATH.md`.
+
 > Starting a new round with several agents? Read `docs/CAMPAIGN_PLAYBOOK.md` first (roles, shared-file protocol, evidence standards, compute rules).
 
 You are running a computational binder-design workflow (PXDesign diffusion → ProteinMPNN → Protenix/Boltz-2 scoring) on one shared RTX 5090.

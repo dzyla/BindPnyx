@@ -19,7 +19,7 @@ Many cheap backbones → one cheap screen → expensive models only on the survi
 5. **Triage** with fastPISA and an in-house shape-complementarity implementation (flags, not scores), de-duplicate, tier.
 6. **Review package** `final_design/` per run: best models (CIF/PDB), FASTA, tables, plots, PyMOL/ChimeraX scripts, a report with all statistics.
 
-**If you read one thing, read [docs/DESIGN_PATH.md](docs/DESIGN_PATH.md).** It is the operating
+**Fresh clone? Start with [docs/START_HERE.md](docs/START_HERE.md)** (link your private workspace, first-day checklist, tool map). **If you read one thing, read [docs/DESIGN_PATH.md](docs/DESIGN_PATH.md).** It is the operating
 knowledge from running real campaigns with this code, with the measurement attached to each rule:
 how to choose the oracle pair for a target class (and why inheriting it fails), why a low score is
 uninformative without carriers, the batch discipline that makes a number comparable, which lever

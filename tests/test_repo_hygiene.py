@@ -15,12 +15,16 @@ def test_vendored_alphafold_data_package_is_present():
     assert [n for n in need if not (VENDORED / n).is_file()] == []
 
 
-@pytest.mark.skipif(shutil.which("git") is None or not (REPO / ".git").exists(), reason="not a git checkout")
-def test_gitignore_does_not_swallow_source_packages():
+@pytest.mark.skipif(shutil.which("git") is None or not (REPO / ".gitignore").exists(), reason="no git or no .gitignore")
+def test_gitignore_does_not_swallow_source_packages(tmp_path):
+    """The rules are checked in a scratch repository that holds only a copy of .gitignore. Asking git about paths inside THIS checkout breaks as soon as `data/`
+    or `out/` is a symlink into a workspace folder (`git check-ignore` exits 128, 'beyond a symbolic link'), which is the normal state of a working clone."""
+    shutil.copy(REPO / ".gitignore", tmp_path / ".gitignore")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     for f in ("colabdesign/af/alphafold/data/parsers.py", "colabdesign/af/alphafold/data/tools/utils.py"):
-        r = subprocess.run(["git", "check-ignore", "-q", f], cwd=REPO)
+        r = subprocess.run(["git", "check-ignore", "-q", f], cwd=tmp_path)
         assert r.returncode == 1, f"{f} is git-ignored: an unanchored pattern in .gitignore matches a python package again"
-    r = subprocess.run(["git", "check-ignore", "-q", "data/targets/pdl1/x"], cwd=REPO)
+    r = subprocess.run(["git", "check-ignore", "-q", "data/targets/pdl1/x"], cwd=tmp_path)
     assert r.returncode == 0                                      # the top-level data/ directory (fetched targets) is still ignored
 
 
