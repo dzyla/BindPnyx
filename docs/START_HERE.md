@@ -82,3 +82,4 @@ These come from two campaigns on different targets; the length and refinement fi
 Never `pkill -f` a pattern in your own command line. Capture `$?` on the next line. `State=COMPLETED`, exit 0 and a non-empty table are not success: check the per-row status.
 Never type hotspot indices by hand. Never compare scores across batches. Never report a pass as a binder. Never push the working tree: build a clean export, scan it, review it.
 Full list with the failure behind each: `docs/DESIGN_PATH.md` section 12 and `AGENTS.md`.
+How each of those rules was first learned, and which early claims were withdrawn: `docs/HISTORY.md`.
