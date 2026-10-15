@@ -293,6 +293,41 @@ Licence: **PolyForm Noncommercial 1.0.0** — academic/public-research use is pe
 needs the author's permission. Install it in its own environment (it bundles Mosaic modules and will
 collide with another Mosaic install).
 
+### Why searching for "arcrefine" will not find it, even when it is installed
+
+**Nothing on disk is called `arcrefine`.** The distribution installs as
+`foldarc-structural-carryover` and provides the modules `mosaic` and `structural_carryover` and the
+console script `structural-carryover`. So `pip list | grep -i arcrefine`, `import arcrefine` and a
+filename search all come back empty on a perfectly working install -- this has already caused one
+agent to report the tool as "not installed anywhere" and argue against a step that had been running
+for weeks. **Probe for `structural-carryover` or `foldarc-structural-carryover` instead**, and treat a
+name-based miss as no evidence either way.
+
+Install it in its own environment (it bundles Mosaic modules): conda env at python 3.12,
+`pip install uv`, then with `UV_PROJECT_ENVIRONMENT` pointed at that env,
+`uv pip sync requirements-linux-cuda12.lock` followed by `uv pip install --no-deps .`. The lock file
+is CUDA 12. Finish with an import test -- `python -c "import jax; print(jax.devices())"` should list a
+CUDA device. `env/bin/structural-carryover` is then the `ARC_BIN` that
+`scripts/campaign/arcrefine_worker.sh` expects.
+
+Per-job runtime environment: `CUDA_VISIBLE_DEVICES=<one card>`,
+`XLA_PYTHON_CLIENT_PREALLOCATE=false`, `HF_HOME` pointed at a shared Hugging Face cache. `--output`
+must name a directory that does not yet exist. Verified flags: `--validate-only` (no GPU and no MSA
+server contacted), `--carryover {on,off}`, `--steps SOFT SHARPEN FINAL`, `--seed`, `--no-predict`.
+
+A `config.json` as actually run: `name`, `parent_sequence`, a `targets` list of
+`{id, sequence, template_pdb, template_chain, use_msa}`, then `carryover: true`,
+`phase_steps: [50, 50, 15]`, `seed`, `recycling_steps: 1`, `sampling_steps: 25`, `num_samples: 1`.
+
+Re-derived 2026-10-15 from the first target's 16-row run log (15 completed plus one
+template-mismatch input error, 4 kept): **every run below 0.35 identity to parent failed, 9 of 9**,
+while at >= 0.35 it was 4 kept of 6 -- so low identity is a reliable reason to discard, and high
+identity is not a reason to keep. ArcRefine's own ipTM rose by more than 0.02 in 9 runs, 6 of which
+were still discarded. The operator-specific install path and the run log live in this lab's local
+guidelines, not in this repository.
+
+The agent-facing version of all of this is `skills/arcrefine-binder-refinement/`.
+
 Input is a JSON with `parent_sequence` plus one entry per target chain; run `--validate-only` first,
 then `--output run`, which writes `optimized.fasta`/`result.json` (`optimized_sequence`) and separate
 parent/final predictions. **The CIF B-factors are placeholders: read the saved pLDDT arrays (0-1).**

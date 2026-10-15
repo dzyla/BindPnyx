@@ -53,7 +53,7 @@ PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q   # CPU-only; data
 | another generator's designs | `scripts/campaign/harvest_boltzgen.py` -> `run_funnel.py --designs-csv` |
 | a third model family (AF3) on a cluster | `scripts/campaign/make_af3_inputs.py`, parse with `funnel/oracles.py:parse_af3_result` |
 | panel selection by a pre-registered rule | `scripts/campaign/select_panel.py` |
-| refinement (use with care) | `scripts/campaign/arcrefine_jobs.py`, `arcrefine_worker.sh`; read `docs/RECOMMENDATIONS.md` section 20 first |
+| refinement (use with care) | `scripts/campaign/arcrefine_jobs.py`, `arcrefine_worker.sh`; read `docs/RECOMMENDATIONS.md` section 20 first. The tool is **not named `arcrefine` on disk** -- binary `structural-carryover`, distribution `foldarc-structural-carryover`, so a name search finds nothing on a working install. Agent-facing: `skills/arcrefine-binder-refinement/` |
 | publish without private data | `scripts/export_public.py --dest <new dir> --run-tests`, `scripts/check_public.py` |
 
 ## 4. Defaults after two campaigns (re-check each on your own target)
