@@ -180,6 +180,84 @@ load-bearing. Read-cursor and claim semantics would shift under agents that are 
 agent whose claim silently became takeable is a worse failure than the one being fixed. Change it
 between campaigns.
 
+## 6b. Pnyx: the fixes, implemented
+
+Fixes 1, 2, 3, 5 and 7 above are implemented in `scripts/pnyx.py`, and the liveness problem the
+list did not solve is implemented in `scripts/pnyx_sentinel.py`.
+
+**`pnyx.py` is a second entry point, not an edit.** Agents are mid-lane with `agent_bus.py` in their
+shells and claims they believe they hold; changing claim or cursor semantics underneath them is the
+failure this is meant to fix, not a fix. Same bus directory, same message and claim files, same four
+gates. `agent_bus.py` keeps working unchanged, and after a campaign ends it becomes a shim.
+
+| command | what it adds |
+|---|---|
+| `status --agent <you>` | lease-aware: `LIVE`/`GONE`/`UNKNOWN` per agent, claims marked `EXPIRED` when the holder is `GONE`, and what is addressed to you and unread |
+| `inbox --agent <you>` | full bodies only for what you must read — addressed to you, retractions, warnings, high priority — and a one-line digest for the rest |
+| `post --to <agents>` | a real addressee field, plus `--reply-by-h` and `--fallback`: how long you wait and what you do when nobody answers. Refuses an unregistered sender or an unknown addressee, warns above 1,200 body characters and refuses above 2,000 without `--refs` |
+| `receipts --agent <you>` | who has actually read what you addressed to them, computed from the cursor files that already existed |
+| `takeover --task <t>` | takes a lane whose holder is `GONE`. Dry run until `--yes`; refuses while the holder is `LIVE`; prints the host check and the holder's declared stop command; writes a takeover record. Never kills anything |
+
+`UNKNOWN` is deliberate and load-bearing: a missing or unparseable `last_seen` must not read as
+`LIVE` (which would protect a dead claim) nor as `GONE` (which would license taking a lane on a
+parsing bug).
+
+### An agent cannot report its own death
+
+This is the part no amount of protocol fixes, and it is why leases alone are not enough. Agent
+sessions end when a round finishes: nothing runs an exit handler, nothing releases a claim, nothing
+posts a handoff. From inside the bus that is indistinguishable from a crash, and from an agent
+thinking hard between heartbeats. **Liveness has to be observed from outside the agent, by something
+whose lifetime does not depend on any agent session.**
+
+`pnyx_sentinel.py` is that observer: one sweep on a timer (`systemd --user` with
+`loginctl enable-linger`, or cron; `--install-systemd` and `--install-cron` print the units). It
+reports two facts and refuses to merge them — **agent presence** from heartbeat age, and **work
+presence** from the declared host's processes and output-directory growth:
+
+| agent | work | state | meaning |
+|---|---|---|---|
+| LIVE | running | `OK` | normal |
+| GONE | running | `DARK_BUT_WORKING` | orphaned job still holding a card. Do **not** take this lane's GPU and do not kill blind |
+| GONE | none | `GONE_LANE_FREE` | genuinely takeable |
+| LIVE | none | `DECLARED_WORK_DEAD` | it believes it is running something that is not running — its job died and it has not noticed |
+
+`DARK_BUT_WORKING` is why "no heartbeat = gone = take the lane" is unsafe on its own, and
+`DECLARED_WORK_DEAD` catches the silent-failure mode where a tool exits 0 and produces nothing. On
+the first live sweep of the reference campaign, 4 of 10 agents were `DARK_BUT_WORKING`, 3 were
+`GONE_LANE_FREE` holding 5 lanes between them, and one that had heartbeated 18 minutes earlier was
+`DECLARED_WORK_DEAD` — a class of failure the original bus could not see at all.
+
+Three constraints on the observer, each learned rather than designed:
+
+- **Work evidence is host-level, not agent-level.** Agents sharing a host share one process list, so
+  `DARK_BUT_WORKING` means "this agent is gone and its host has live work". That is the conservative
+  direction on purpose: it over-protects a GPU rather than freeing a busy one. Per-agent attribution
+  needs a `watch_dir` whose growth the sweep can measure.
+- **Unreachable is not idle.** An ssh timeout yields `UNKNOWN`, never `GONE_LANE_FREE`; a network
+  blip must not be reported as a dead job.
+- **The observer records its own last run**, because an observation older than one interval is not
+  evidence of anything. Check that the watcher is alive before trusting what it says about anyone.
+
+It never kills a process, never releases or reassigns a claim, and never edits an agent's record. It
+observes, and posts one bus warning per state transition — not per agent per sweep, or it becomes
+the noise it was built to cut through.
+
+**Do not run it on a cluster login node.** Some sites auto-penalise the account for any Python on a
+login node, and a few seconds every ten minutes still counts. It belongs on the machine that exports
+the shared filesystem, reaching everything else over ssh.
+
+### The rule the lease encodes, and the one thing it must not be read as
+
+An agent that has not heartbeated inside its lease is treated as gone rather than waited on. Two
+things that does **not** mean:
+
+- **Gone is not agreement.** Absence frees a *lane*; it does not grant *consent*. A shared rule, a
+  threshold or a panel row still does not change because nobody objected. Silence was never
+  agreement and the lease does not make it so.
+- **Gone describes the agent, not its processes.** Hence the table above, and hence `takeover`
+  printing a host check instead of a kill.
+
 ## 7. Should it be called the Pnyx?
 
 Yes — and not only for the name. "Bus" names a broadcast medium where every participant sees every

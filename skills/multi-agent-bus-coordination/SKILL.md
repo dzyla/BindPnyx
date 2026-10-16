@@ -114,7 +114,50 @@ Procedural, not rhetorical:
 5. **The agent that proposed a design does not validate it.** If you generated it, someone else
    re-scores it before it enters a panel.
 
-## Heartbeat even when nothing is running, and read a claim's age before trusting it
+## Use `pnyx.py`, and heartbeat even when nothing is running
+
+`scripts/pnyx.py` is a second entry point on the same bus directory — same message and claim files,
+same four gates, `agent_bus.py` unchanged. Prefer it:
+
+```bash
+python3 scripts/pnyx.py status --agent <you>     # instead of agent_bus.py status
+python3 scripts/pnyx.py inbox  --agent <you>     # full bodies only for what you must read
+python3 scripts/pnyx.py post --from <you> --to <them> --reply-by-h 4 \
+        --fallback "proceed with the shallow lane alone" --topic question ...
+python3 scripts/pnyx.py receipts --agent <you>   # who actually read what you sent them
+python3 scripts/pnyx.py takeover --task <t> --agent <you>   # dry run until --yes
+```
+
+It refuses an unregistered sender, refuses an unknown addressee, warns above 1,200 body characters
+and refuses above 2,000 without `--refs`.
+
+**The lease: no heartbeat inside it (6 h by default) and you are GONE — your claim reads EXPIRED and
+is takeable.** Heartbeat on arrival, when a job starts or ends, and **when you stop**. Agent
+sessions end when a round finishes without running any exit handler, so going dark is the normal
+case, not an accident. Clear `--running ""` and `release` any lane you are not actively working.
+
+Two things GONE does not mean, and conflating either does real damage:
+
+- **GONE is not agreement.** Absence frees a *lane*; it does not grant *consent*. A shared rule, a
+  threshold or a panel row does not change because nobody objected.
+- **GONE describes the agent, not its processes.** A dead session's job can still hold a card.
+
+## An agent cannot report its own death: read the sentinel before taking a lane
+
+`scripts/pnyx_sentinel.py` runs on a timer outside every agent session and reports agent presence
+and work presence **separately** (`bus/liveness/<agent>.json`):
+
+| agent | work | state | what you do |
+|---|---|---|---|
+| LIVE | running | `OK` | nothing |
+| GONE | running | `DARK_BUT_WORKING` | **do not take this lane's GPU, do not kill blind** — adopt the job |
+| GONE | none | `GONE_LANE_FREE` | takeable |
+| LIVE | none | `DECLARED_WORK_DEAD` | tell its owner: its job died and it has not noticed |
+
+Work evidence is host-level, so `DARK_BUT_WORKING` means "gone, and its host has live work". Check
+`bus/liveness/_sentinel.json` first: an observation older than one sweep interval is not evidence.
+
+## Read a claim's age before trusting it
 
 A claim never expires and presence never lapses, so a crashed or finished session holds its lane
 forever. Measured in the reference campaign: **9 of 9 outstanding claims were held by an agent whose
