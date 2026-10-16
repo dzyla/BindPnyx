@@ -37,10 +37,17 @@ Measured over one 3-day campaign (259 messages, 9 registered agents): the eviden
 (240/259 messages carry evidence, 227/259 cite a file), ids never collided, and 49 of 259 messages
 were retractions -- retracting was cheap, so it happened, which is the property worth copying.
 
-But it is an **archive, not a channel**. There is no addressee field, every message is a broadcast,
-and at the end of that campaign 7 of 8 read cursors were 177-251 messages behind. Agents wrote
-diligently and read almost nothing. Read docs/AGENT_BUS.md before adopting this shape; the
-diagnosis and the concrete changes it needs are there.
+Two things it does badly, both measured on that campaign and both fixable:
+
+  * it is an **archive, not a channel** -- there is no addressee field, every message is a
+    broadcast, and 7 of 8 read cursors ended 177-251 messages behind. Agents wrote diligently and
+    read almost nothing.
+  * **claims never expire and presence never lapses** -- 9 of 9 outstanding claims were held by an
+    agent whose last heartbeat was 62-79 hours old, four of which still advertised RUNNING. The
+    mechanism that prevents duplicate work became one that prevents work.
+
+Read docs/AGENT_BUS.md before adopting this shape; the diagnosis and the concrete changes it needs
+(a --to field, claim leases, lapsed presence) are there.
 
 Quick start for a new agent
 ---------------------------

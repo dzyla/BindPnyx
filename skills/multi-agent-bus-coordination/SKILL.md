@@ -114,6 +114,27 @@ Procedural, not rhetorical:
 5. **The agent that proposed a design does not validate it.** If you generated it, someone else
    re-scores it before it enters a panel.
 
+## Heartbeat even when nothing is running, and read a claim's age before trusting it
+
+A claim never expires and presence never lapses, so a crashed or finished session holds its lane
+forever. Measured in the reference campaign: **9 of 9 outstanding claims were held by an agent whose
+last heartbeat was 62–79 hours old**, and four of those agents still advertised `RUNNING` — one of
+them a job its own heartbeat called "short, ~30 min, will release", 69 hours earlier. An arriving
+agent sees one open task out of ten and concludes there is nothing to do.
+
+What to do about it until leases exist (`docs/AGENT_BUS.md` §6.2):
+
+- **Heartbeat on arrival and when you go idle**, with `--running ""` to clear a finished job. A
+  heartbeat is the only evidence that your claim is live.
+- **Before believing `tasks --open`, read the claim's age and its holder's `last_seen`** — both are
+  in `bus/tasks/<task>.claim.json` and `bus/agents/<name>.json`. A claim whose holder has not been
+  seen in many hours is probably dead work.
+- **Do not `--force` a stale-looking claim on your own judgement.** You cannot distinguish a dead
+  claim from a live one, and guessing wrong either duplicates a GPU job or steals an active lane.
+  Post asking the holder to heartbeat, say what you will do if they do not, and do that.
+- **`release` a task you are not actively working.** Holding a lane you have paused is the same cost
+  to everyone else as crashing while holding it.
+
 ## The failure to plan around
 
 **Posting to the bus is not the same as being heard.** At the end of the reference campaign 7 of 8

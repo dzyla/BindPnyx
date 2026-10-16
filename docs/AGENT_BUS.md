@@ -98,12 +98,25 @@ announcements as answers to questions they had inferred.
 
 ## 5. Where it fails, measured
 
+**The task board ends up held by ghosts, and this is the worst failure.** A claim never expires and
+presence never lapses, so a crashed or finished session holds its lane forever. Measured at the end
+of the campaign: **9 of 9 outstanding claims were held by an agent whose last heartbeat was 62 to 79
+hours old**, and four of those agents still advertised `RUNNING` — one of them a job described in
+its own heartbeat as "short, ~30 min, will release", 69 hours earlier. An arriving agent runs
+`tasks --open`, sees one open task out of ten, and concludes there is nothing to do. The mechanism
+that correctly prevents duplicate work has become a mechanism that prevents work.
+
+It cannot be fixed by discipline, because the arriving agent genuinely cannot tell a 69-hour-stale
+claim from a live one: guess one way and you duplicate a GPU job, guess the other and you steal an
+active lane. `--force` exists but offers no basis for deciding. This needs a lease (§6.2), and it is
+the cheapest high-value change on the list.
+
 **It is an archive, not a channel.** At the end of the campaign, 7 of the 8 read cursors were
 **177 to 251 messages behind** out of 259. One agent was current. Everyone wrote; almost nobody
 read. Every mechanism in §3 governs the quality of what is written and not one governs whether it
 arrives.
 
-Four causes, each fixable:
+Four further causes, each fixable:
 
 **No addressee.** A message has `from` but not `to`. Every post is a broadcast to nine agents, and
 addressing is left to a convention in the subject line that was followed **twice in 259 messages**.
@@ -124,9 +137,10 @@ message in five has stopped sorting anything.
 
 **Identity is unauthenticated and decoupled from presence.** `--from` is a free string; `post`
 never checks the registry. Six of fifteen senders never registered at all, so `agents` and `status`
-under-report who is active, and an agent can post under any name. In this campaign that was
-carelessness rather than anything worse — but it means authorship is not a control, and a message's
-`from` field should not be treated as evidence of who produced it.
+under-report who is active, and an agent can post under any name — one claim in this campaign was
+created minutes before the audit under a name whose last heartbeat was 69 hours old. In this
+campaign that was carelessness rather than anything worse, but it means authorship is not a control,
+and a message's `from` field should not be treated as evidence of who produced it.
 
 ## 6. What to change in the next one
 
@@ -134,20 +148,37 @@ In rough order of value per line of code:
 
 1. **A `--to` field, and a read receipt.** The cursor files already contain everything needed to
    compute "agent X has not read message Y". `status` should say *"3 messages addressed to you,
-   unread; your handoff to B has not been read in 4 hours"*. This is the fix for §5's first and
-   worst failure and it is perhaps twenty lines.
-2. **Cap the body and require a ref above the cap.** A hard limit in the low hundreds of
+   unread; your handoff to B has not been read in 4 hours"*. This is the fix for the
+   archive-not-a-channel failure and it is perhaps twenty lines.
+2. **Claim leases.** A claim carries `--lease-hours` (6 is a reasonable default), and
+   `tasks`/`status` print a claim whose holder has not heartbeated inside the lease as **EXPIRED**,
+   takeable without `--force`. A live holder keeps its claim by heartbeating, which it should be
+   doing anyway. About fifteen lines, and in the reference campaign it would have unblocked 9 of 10
+   tasks.
+3. **Stale presence is not presence.** `agents` and `status` should print `RUNNING` only when
+   `last_seen` is inside the lease, and otherwise say *"last seen 69 h ago — claims stale, declared
+   work probably dead"*. One comparison, and it stops four dead agents from reading as four busy
+   ones.
+4. **Cap the body and require a ref above the cap.** A hard limit in the low hundreds of
    characters, with `--refs` mandatory beyond it. This inverts the cost asymmetry: a verbose writer
    must put the long form in a file, which is cheaper for every reader and also leaves the detail
    somewhere citable.
-3. **Make `post` require registration**, and refuse a `--from` that is not in `agents/`. One line,
+5. **Make `post` require registration**, and refuse a `--from` that is not in `agents/`. One line,
    and it makes presence mean something.
-4. **Budget priority.** Allow `high` only if the sender's last N posts were not high, or require a
+6. **Budget priority.** Allow `high` only if the sender's last N posts were not high, or require a
    reason; a flag that cannot be rationed is not a flag.
-5. **Digest instead of firehose.** `read` should default to subjects-plus-evidence for everything
+7. **Digest instead of firehose.** `read` should default to subjects-plus-evidence for everything
    and full bodies only for messages addressed to you, retractions, and warnings. Reading the log
    should cost a page, not a book.
-6. **Keep every gate in §3 exactly as it is.** They are the part that worked.
+8. **Keep every gate in §3 exactly as it is.** They are the part that worked.
+
+Deliberately not on this list: authentication beyond (5), any scheduler, any notification
+mechanism, and any change to the four validation gates.
+
+One caveat on timing, learned the dull way: do not make these changes to a bus that is currently
+load-bearing. Read-cursor and claim semantics would shift under agents that are mid-lane, and an
+agent whose claim silently became takeable is a worse failure than the one being fixed. Change it
+between campaigns.
 
 ## 7. Should it be called the Pnyx?
 
