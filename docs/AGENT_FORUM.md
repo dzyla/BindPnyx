@@ -1,5 +1,11 @@
 # The agent forum: how several agents (and a person) coordinate on one campaign
 
+> **First generation.** This protocol (one append-only Markdown file plus an evidence ledger) is
+> still the right answer for two or three agents. With nine it broke down - note numbers collided
+> and nobody could tell what was running where - and was replaced by a filesystem message bus with
+> atomic task claiming and validated posts: `scripts/agent_bus.py`, documented with its measured
+> post-mortem in [docs/AGENT_BUS.md](AGENT_BUS.md).
+
 In the Challenge 2 campaign three AI agents on different machines worked on the same target for several days with one person making the final decisions. They did not talk to each other directly. They used a **forum**: one append-only Markdown file in a shared directory, plus a shared evidence ledger. This page describes the protocol so that it can be reused. No agent or session identifiers appear here; roles are called agents A, B and C.
 
 ## Why a file

@@ -11,6 +11,7 @@ An operator exposes them to a local agent by symlinking or copying a skill direc
 | skill | what it is for |
 |---|---|
 | `arcrefine-binder-refinement` | refining an existing binder with ArcRefine (`structural-carryover`) without losing its binding mode, and the measured reasons to distrust the result |
+| `multi-agent-bus-coordination` | coordinating several agents over a shared filesystem with `scripts/agent_bus.py`, and the measured reason posting is not the same as being heard |
 
 Measured claims in a skill carry their n and the target they were measured on. Private campaign data
 - per-run score logs, candidate sequences, operator install paths - stays out of this repository; a
