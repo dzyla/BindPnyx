@@ -80,6 +80,11 @@ can score a known binder for that target.
 
 ## 4. Batch discipline, and what counts as a replicate
 
+> Extended by `docs/SELECTION_AND_EVIDENCE.md` sections 2-5, with the measured answer to what a
+> replicate actually tells you: the sign of a margin reproduces, the rank order does not
+> (Spearman 0.673, n = 23 designs across two seed sets).
+
+
 - Compare designs **only within one batch**, with the parent or reference present. Batch effects
   are small but real (SD ≈ 0.02); cross-batch comparisons of absolute scores are invalid.
 - A **replicate** is a differently composed batch (different members or order) or a different
@@ -92,6 +97,11 @@ can score a known binder for that target.
   confirmation. Say which one you have.
 
 ## 5. The metric
+
+> See `docs/SELECTION_AND_EVIDENCE.md` section 1 for why seven generic interface descriptors were
+> retired here -- each placed a composition-matched permutation of the native binder level with or
+> above the native binder -- and section 3 for the rate-minus-permutation-baseline that replaced them.
+
 
 - Use **interface ipSAE** (PAE between binder and target tokens, 10 Å cutoff), in the **minimum of
   the two directions**. On a multi-chain target the maximum direction reads ~0.17-0.20 higher and

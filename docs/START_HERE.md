@@ -39,7 +39,7 @@ PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q   # CPU-only; data
 3. **Calibrate against the native interface**: run fastPISA on the real complex first. If the natural binder trips an interface flag (apolar fraction, aromatics), do not rank on it.
 4. **Choose the oracle pair for this target class and validate it on solved complexes** (`docs/DESIGN_PATH.md` section 2). An oracle that scores a known binder 0 cannot rank
    designs. Put carriers (one expected failure, two expected passers, a shuffle of the native binder) in every batch.
-5. **Write the selection rule down before the first result** (`scripts/campaign/select_panel.py` documents one). Keep a copy next to the panel.
+5. **Write the selection rule down before the first result** -- to a timestamped file, not just a decision; `docs/SELECTION_AND_EVIDENCE.md` section 6 has the three tiebreakers that are secretly assertions -- (`scripts/campaign/select_panel.py` documents one). Keep a copy next to the panel.
 6. **Use every machine from the first hour**, with static job assignment and results read on the machine that wrote them.
 7. If novelty is a rule, screen it **before** spending oracle time.
 
@@ -54,6 +54,7 @@ PYTHONPATH=$(pwd) .pxd/envs/pxd/bin/python -m pytest tests -q   # CPU-only; data
 | a third model family (AF3) on a cluster | `scripts/campaign/make_af3_inputs.py`, parse with `funnel/oracles.py:parse_af3_result` |
 | panel selection by a pre-registered rule | `scripts/campaign/select_panel.py` |
 | refinement (use with care) | `scripts/campaign/arcrefine_jobs.py`, `arcrefine_worker.sh`; read `docs/RECOMMENDATIONS.md` section 20 first. The tool is **not named `arcrefine` on disk** -- binary `structural-carryover`, distribution `foldarc-structural-carryover`, so a name search finds nothing on a working install. Agent-facing: `skills/arcrefine-binder-refinement/` |
+| score a batch on a mechanism band, rank on a permutation-baselined rate | `skills/cofold-band-scoring/` (runnable blocks); read `docs/SELECTION_AND_EVIDENCE.md` first |
 | publish without private data | `scripts/export_public.py --dest <new dir> --run-tests`, `scripts/check_public.py` |
 
 ## 4. Defaults after two campaigns (re-check each on your own target)
